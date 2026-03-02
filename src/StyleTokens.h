@@ -16,7 +16,7 @@ namespace StyleTokens {
     static constexpr uint32_t kDialogBg = 0xff1a1a1a; // fully opaque
 
     // White overlay hierarchy (all on top of dark panels)
-    static constexpr uint32_t kPanelTitle = 0xe6ffffff; // 90% — "OPTIONS" heading
+    static constexpr uint32_t kPanelTitle = 0xe6ffffff; // 90% — "PROJECT" heading
     static constexpr uint32_t kVoiceName = 0xd9ffffff; // 85% — voice name labels
     static constexpr uint32_t kValue = 0xccffffff; // 80% — numeric value labels
     static constexpr uint32_t kSectionHead = 0x80ffffff; // 50% — section headers
@@ -56,7 +56,7 @@ namespace StyleTokens {
     // SeekBar
     static constexpr uint32_t kSeekBarBg = 0xff252525; // dark background
     static constexpr uint32_t kSeekBarTrack = 0xff404040; // unfilled track
-    static constexpr uint32_t kSeekBarLoop = 0x5042a2c8; // loop region highlight (blue 31%)
+    static constexpr uint32_t kSeekBarLoop = 0x8c42a2c8; // loop region highlight (blue 55%)
     static constexpr uint32_t kSeekBarPlayhead = 0xffffffff; // playhead handle — white
     static constexpr uint32_t kSeekBarHandle = 0xff42a2c8; // loop handles — JUCE default blue
     static constexpr uint32_t kSeekBarTime = 0x80ffffff; // time label text (50%)

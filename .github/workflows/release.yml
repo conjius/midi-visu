@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache JUCE
+        id: cache-juce
+        uses: actions/cache@v4
+        with:
+          path: ../../Downloads/JUCE
+          key: juce-8.0.12
+
+      - name: Clone JUCE
+        if: steps.cache-juce.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ../../Downloads
+          git clone --depth 1 --branch 8.0.12 https://github.com/juce-framework/JUCE.git ../../Downloads/JUCE
+
+      - name: Configure (Release)
+        run: cmake -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Standalone
+        run: cmake --build cmake-build-release --target midi-visu_Standalone --config Release
+
+      - name: Build VST3
+        run: cmake --build cmake-build-release --target midi-visu_VST3 --config Release
+
+      - name: Generate version tag
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          DATE=$(date +%Y%m%d)
+          TAG="v${DATE}-${SHORT_SHA}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "name=midi-visu $TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Zip Standalone
+        run: |
+          cd cmake-build-release/midi-visu_artefacts/Release/Standalone
+          zip -r "$GITHUB_WORKSPACE/midi-visu-Standalone.zip" midi-visu.app
+
+      - name: Zip VST3
+        run: |
+          cd cmake-build-release/midi-visu_artefacts/Release/VST3
+          zip -r "$GITHUB_WORKSPACE/midi-visu-VST3.zip" midi-visu.vst3
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.name }}
+          body: |
+            Automated release from commit ${{ github.sha }}.
+
+            **Artifacts:**
+            - `midi-visu-Standalone.zip` — macOS standalone app
+            - `midi-visu-VST3.zip` — VST3 plugin
+          files: |
+            midi-visu-Standalone.zip
+            midi-visu-VST3.zip

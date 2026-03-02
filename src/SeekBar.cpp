@@ -104,6 +104,11 @@ void SeekBar::paint(Graphics& g) {
     g.setColour(loopEnabled_ ? loopCol : loopCol.withMultipliedAlpha(0.3f));
     g.fillRoundedRectangle(lsPx, trackY, lePx - lsPx, trackH, 2.0f);
 
+    // Loop region highlight above and below track (interval drag zones)
+    g.fillRoundedRectangle(lsPx, 0.0f, lePx - lsPx, trackY, 2.0f);
+    g.fillRoundedRectangle(lsPx, static_cast<float>(kTrackAreaHeight),
+                           lePx - lsPx, static_cast<float>(kLabelHeight), 2.0f);
+
     // Loop handles are drawn by loopSlider_ (JUCE blue thumbs)
 
     // Loop time labels below the track area
@@ -149,13 +154,29 @@ void SeekBar::paintOverChildren(Graphics& g) {
 
 void SeekBar::mouseDown(const MouseEvent& e) {
     const float mx = static_cast<float>(e.x);
+
+    const float trackCY = static_cast<float>(kTrackAreaHeight) * 0.5f;
+    const float trackY = trackCY - 2.0f;
+    const float trackBottom = trackCY + 2.0f;
+    if (e.y < trackY || e.y >= kTrackAreaHeight) {
+        // Above track or label area: interval drag if within loop region
+        if (RangeSliderLogic::isInMiddleZone(mx, logic.loopStart(), logic.loopEnd(),
+                                              0.0, logic.maxValue(),
+                                              getTrackStart(), getTrackWidth(),
+                                              kThumbRadius)) {
+            activeHandle = MultiHandleSliderLogic::HandleType::MiddleZone;
+            dragStartMouseX = mx;
+            dragStartLoopMin = logic.loopStart();
+            dragStartLoopMax = logic.loopEnd();
+        }
+        return;
+    }
+
+    // Track area: check for individual handles first
     activeHandle = logic.hitTest(mx, getTrackStart(), getTrackWidth(), kThumbRadius);
 
-    if (activeHandle == MultiHandleSliderLogic::HandleType::MiddleZone) {
-        dragStartMouseX = mx;
-        dragStartLoopMin = logic.loopStart();
-        dragStartLoopMax = logic.loopEnd();
-    } else if (activeHandle == MultiHandleSliderLogic::HandleType::None) {
+    if (activeHandle == MultiHandleSliderLogic::HandleType::MiddleZone
+        || activeHandle == MultiHandleSliderLogic::HandleType::None) {
         // Click-to-seek: move playhead to click position
         logic.dragHandle(MultiHandleSliderLogic::HandleType::Playhead,
                          mx, getTrackStart(), getTrackWidth());
