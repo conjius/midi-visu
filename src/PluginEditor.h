@@ -13,45 +13,44 @@
 #include "VideoBackground.h"
 
 //==============================================================================
-class MidiVisuEditor  : public juce::AudioProcessorEditor,
-                        private juce::Timer
+class MidiVisuEditor  : public AudioProcessorEditor,
+                        private Timer
 {
 public:
     explicit MidiVisuEditor (MidivisuAudioProcessor&);
     ~MidiVisuEditor() override;
 
     //==============================================================================
-    void paint (juce::Graphics&) override;
-    void paintOverChildren (juce::Graphics&) override;
+    void paint (Graphics&) override;
+    void paintOverChildren (Graphics&) override;
     void resized() override;
-    bool keyPressed (const juce::KeyPress& key) override;
-    void mouseDown  (const juce::MouseEvent&) override;
-    void mouseDrag  (const juce::MouseEvent&) override;
-    void mouseUp    (const juce::MouseEvent&) override;
-    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+    bool keyPressed (const KeyPress& key) override;
+    void mouseDown  (const MouseEvent&) override;
+    void mouseDrag  (const MouseEvent&) override;
+    void mouseUp    (const MouseEvent&) override;
+    void mouseWheelMove (const MouseEvent&, const MouseWheelDetails&) override;
 
 private:
     void timerCallback() override;
 
     MidivisuAudioProcessor& audioProcessor;
     VideoBackground         videoBackground;
-    juce::Image             videoFrame;
+    Image             videoFrame;
 
     // Smoothed radii
     float smoothedRadius[4]     { 0.0f, 0.0f, 0.0f, 0.0f };
     float drumSmoothedRadius[4] { 0.0f, 0.0f, 0.0f, 0.0f };
     int   lastDrumHitCount[4]   { 0, 0, 0, 0 };
-    static constexpr float minRadius      = 20.0f;
-    static constexpr float maxRadius      = 280.0f;
-    static constexpr float smoothing      = 0.10f;
-    static constexpr float drumRestRadius = 30.0f;
-    static constexpr float drumHitRadius  = 100.0f;
-    static constexpr float drumSmoothing  = 0.1f;
+    static constexpr float smoothing    = 0.10f;
+    static constexpr float drumSmoothing = 0.1f;
+
+    // Clock sync
+    int lastClockPulse = 0;
 
     // Log panel
     bool                      logPanelOpen    = false;
-    juce::StringArray         logLines;
-    juce::Array<juce::Colour> logColors;
+    StringArray         logLines;
+    Array<Colour> logColors;
     int                       logScrollOffset = 0;
     int                       lastCh10RawHitCount       = 0;
     int                       lastChannelNoteOnCount[4] = { 0, 0, 0, 0 };
@@ -59,37 +58,51 @@ private:
     static constexpr int logPanelWidth = 300;
 
     // Circle positions (0-3 = drums, 4-6 = melodic tracks 1-3)
-    juce::Point<float> circlePos[7];
+    Point<float> circlePos[7];
+    // Brownian float
+    Point<float> floatOffset[7];
+    Point<float> floatVel[7];
     int                draggedCircle = -1;
-    juce::Point<float> dragOffset;
+    Point<float> dragOffset;
 
     void initDefaultPositions();
-    void writePositionsToFile (const juce::File&);
-    void readPositionsFromFile (const juce::File&);
+    void writePositionsToFile (const File&);
+    void readPositionsFromFile (const File&);
     void savePositions();   // opens "Save as…" dialog
     void loadPositions();   // opens "Load" dialog
-    juce::File getAutoSaveFile() const;
-    juce::File lastPositionsFile;
-    std::unique_ptr<juce::FileChooser> fileChooser;
+    File getAutoSaveFile() const;
+    File lastPositionsFile;
+    std::unique_ptr<FileChooser> fileChooser;
 
     // Video file selection
-    juce::File lastVideoFile;
-    std::unique_ptr<juce::FileChooser> videoChooser;
+    File lastVideoFile;
+    std::unique_ptr<FileChooser> videoChooser;
     void chooseVideoFile();
 
     // Options panel (O key)
     bool               optionsPanelOpen = false;
-    juce::ComboBox     voiceChannelBox[7];
-    juce::ToggleButton videoToggle { "Video" };
-    juce::ToggleButton blurToggle  { "Blur" };
-    juce::Slider       blurSlider;
-    juce::Slider       videoZoomSlider;
-    juce::Slider       videoOpacitySlider;
-    juce::TextButton   saveDefaultButton   { "Save" };
-    juce::TextButton   savePositionsButton { "Save as..." };
-    juce::TextButton   loadPositionsButton { "Load" };
-    juce::TextButton   loadVideoButton     { "Load Video..." };
-    juce::TextButton   midiSettingsButton  { "Settings" };
+    ComboBox     voiceChannelBox[7];
+    ComboBox     clockDivisionBox;
+    ToggleButton videoToggle { "Video" };
+    ToggleButton blurToggle  { "Blur" };
+    ToggleButton floatToggle      { "Floating" };
+    ToggleButton collisionToggle  { " Collisions" };
+    ToggleButton clockKickToggle  { "Clock Sync" };
+
+    // Ball masses — all equal for now, prepared for per-ball tuning.
+    float ballMass[7] = { 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f };
+    Slider       blurSlider;
+    Slider       videoZoomSlider;
+    Slider       videoOpacitySlider;
+    Slider       ballSizeSlider;          // TwoValueHorizontal range slider
+    Slider       floatIntensitySlider;
+    Slider       floatSpeedSlider;
+    Slider       clockKickIntensitySlider;
+    TextButton   saveDefaultButton   { "Save Settings" };
+    TextButton   savePositionsButton { "Save Settings to..." };
+    TextButton   loadPositionsButton { "Load" };
+    TextButton   loadVideoButton     { "Load Video..." };
+    TextButton   midiSettingsButton  { "Audio / MIDI Settings" };
 
     void showJuceAudioSettings();
 

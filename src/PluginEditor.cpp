@@ -90,6 +90,45 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
     videoOpacitySlider.setTextBoxStyle(Slider::TextBoxRight, false, 46, 20);
     addChildComponent(videoOpacitySlider);
 
+    // Clock division: id == pulse count per division (24 PPQ)
+    clockDivisionBox.addItem("1    (whole)",     96);
+    clockDivisionBox.addItem("1/2  (half)",      48);
+    clockDivisionBox.addItem("1/4  (quarter)",   24);
+    clockDivisionBox.addItem("1/8  (eighth)",    12);
+    clockDivisionBox.addItem("1/16 (sixteenth)",  6);
+    clockDivisionBox.addItem("1/32 (32nd)",       3);
+    clockDivisionBox.setSelectedId(24, dontSendNotification);
+    addChildComponent(clockDivisionBox);
+
+    ballSizeSlider.setSliderStyle(Slider::TwoValueHorizontal);
+    ballSizeSlider.setRange(5.0, 500.0, 1.0);
+    ballSizeSlider.setMinAndMaxValues(20.0, 280.0, dontSendNotification);
+    ballSizeSlider.setTextBoxStyle(Slider::NoTextBox, true, 0, 0);
+    addChildComponent(ballSizeSlider);
+
+    clockKickIntensitySlider.setRange(0.0, 2.0, 0.01);
+    clockKickIntensitySlider.setValue(1.0, dontSendNotification);
+    clockKickIntensitySlider.setSliderStyle(Slider::LinearHorizontal);
+    clockKickIntensitySlider.setTextBoxStyle(Slider::TextBoxRight, false, 46, 20);
+    addChildComponent(clockKickIntensitySlider);
+
+    floatToggle.setToggleState(true, dontSendNotification);
+    collisionToggle.setToggleState(true, dontSendNotification);
+    clockKickToggle.setToggleState(true, dontSendNotification);
+    addChildComponent(collisionToggle);
+    addChildComponent(clockKickToggle);
+    floatIntensitySlider.setRange(0.0, 1.0, 0.01);
+    floatIntensitySlider.setValue(0.5, dontSendNotification);
+    floatIntensitySlider.setSliderStyle(Slider::LinearHorizontal);
+    floatIntensitySlider.setTextBoxStyle(Slider::TextBoxRight, false, 46, 20);
+    floatSpeedSlider.setRange(0.0, 1.0, 0.01);
+    floatSpeedSlider.setValue(0.3, dontSendNotification);
+    floatSpeedSlider.setSliderStyle(Slider::LinearHorizontal);
+    floatSpeedSlider.setTextBoxStyle(Slider::TextBoxRight, false, 46, 20);
+    addChildComponent(floatToggle);
+    addChildComponent(floatIntensitySlider);
+    addChildComponent(floatSpeedSlider);
+
     saveDefaultButton.onClick   = [this] { writePositionsToFile(getAutoSaveFile()); };
     savePositionsButton.onClick = [this] { savePositions(); };
     loadPositionsButton.onClick = [this] { loadPositions(); };
@@ -104,6 +143,30 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
     setSize(1920, 1080);
     initDefaultPositions();
     readPositionsFromFile(getAutoSaveFile());
+
+    // Open options panel on startup
+    optionsPanelOpen = true;
+    for (auto& box : voiceChannelBox)    box.setVisible(true);
+    videoToggle.setVisible(true);
+    blurToggle.setVisible(true);
+    blurSlider.setVisible(true);
+    videoZoomSlider.setVisible(true);
+    videoOpacitySlider.setVisible(true);
+    saveDefaultButton.setVisible(true);
+    savePositionsButton.setVisible(true);
+    loadPositionsButton.setVisible(true);
+    loadVideoButton.setVisible(true);
+    midiSettingsButton.setVisible(true);
+    ballSizeSlider.setVisible(true);
+    floatToggle.setVisible(true);
+    collisionToggle.setVisible(true);
+    clockKickToggle.setVisible(true);
+    clockDivisionBox.setVisible(true);
+    clockKickIntensitySlider.setVisible(true);
+    floatIntensitySlider.setVisible(true);
+    floatSpeedSlider.setVisible(true);
+    resized();
+
     startTimerHz(60);
 }
 
@@ -165,17 +228,33 @@ void MidiVisuEditor::writePositionsToFile(const File& file)
         arr.add(entry);
     }
     auto* settings = new DynamicObject();
-    settings->setProperty("videoEnabled",  videoToggle.getToggleState());
+    settings->setProperty("ballSizeMin",    ballSizeSlider.getMinValue());
+    settings->setProperty("ballSizeMax",    ballSizeSlider.getMaxValue());
+    settings->setProperty("videoEnabled",   videoToggle.getToggleState());
     settings->setProperty("blurEnabled",   blurToggle.getToggleState());
     settings->setProperty("blurRadius",    blurSlider.getValue());
     settings->setProperty("videoZoom",     videoZoomSlider.getValue());
     settings->setProperty("videoOpacity",  videoOpacitySlider.getValue());
+    settings->setProperty("floatEnabled",     floatToggle.getToggleState());
+    settings->setProperty("collisionEnabled", collisionToggle.getToggleState());
+    settings->setProperty("floatIntensity", floatIntensitySlider.getValue());
+    settings->setProperty("floatSpeed",     floatSpeedSlider.getValue());
+    settings->setProperty("clockDiv",      clockDivisionBox.getSelectedId());
+    settings->setProperty("clockKick",          clockKickToggle.getToggleState());
+    settings->setProperty("clockKickIntensity", clockKickIntensitySlider.getValue());
 
     auto* root = new DynamicObject();
     root->setProperty("circles",  arr);
     root->setProperty("settings", var(settings));
     if (lastVideoFile.existsAsFile())
         root->setProperty("videoPath", lastVideoFile.getFullPathName());
+
+#if JUCE_STANDALONE_APPLICATION
+    if (auto* holder = StandalonePluginHolder::getInstance())
+        if (auto xml = holder->deviceManager.createStateXml())
+            root->setProperty("audioDeviceState", xml->toString());
+#endif
+
     file.getParentDirectory().createDirectory();
     file.replaceWithText(JSON::toString(var(root)));
 }
@@ -211,6 +290,10 @@ void MidiVisuEditor::readPositionsFromFile(const File& file)
 
     if (auto* s = root->getProperty("settings").getDynamicObject())
     {
+        if (s->hasProperty("ballSizeMin") && s->hasProperty("ballSizeMax"))
+            ballSizeSlider.setMinAndMaxValues((double)s->getProperty("ballSizeMin"),
+                                              (double)s->getProperty("ballSizeMax"),
+                                              dontSendNotification);
         if (s->hasProperty("videoEnabled"))
             videoToggle.setToggleState((bool)s->getProperty("videoEnabled"), dontSendNotification);
         if (s->hasProperty("blurEnabled"))
@@ -221,6 +304,20 @@ void MidiVisuEditor::readPositionsFromFile(const File& file)
             videoZoomSlider.setValue((double)s->getProperty("videoZoom"), dontSendNotification);
         if (s->hasProperty("videoOpacity"))
             videoOpacitySlider.setValue((double)s->getProperty("videoOpacity"), dontSendNotification);
+        if (s->hasProperty("floatEnabled"))
+            floatToggle.setToggleState((bool)s->getProperty("floatEnabled"), dontSendNotification);
+        if (s->hasProperty("collisionEnabled"))
+            collisionToggle.setToggleState((bool)s->getProperty("collisionEnabled"), dontSendNotification);
+        if (s->hasProperty("floatIntensity"))
+            floatIntensitySlider.setValue((double)s->getProperty("floatIntensity"), dontSendNotification);
+        if (s->hasProperty("floatSpeed"))
+            floatSpeedSlider.setValue((double)s->getProperty("floatSpeed"), dontSendNotification);
+        if (s->hasProperty("clockDiv"))
+            clockDivisionBox.setSelectedId((int)s->getProperty("clockDiv"), dontSendNotification);
+        if (s->hasProperty("clockKick"))
+            clockKickToggle.setToggleState((bool)s->getProperty("clockKick"), dontSendNotification);
+        if (s->hasProperty("clockKickIntensity"))
+            clockKickIntensitySlider.setValue((double)s->getProperty("clockKickIntensity"), dontSendNotification);
     }
 
     const String videoPath = root->getProperty("videoPath").toString();
@@ -246,7 +343,7 @@ void MidiVisuEditor::savePositions()
     const File startDir = lastPositionsFile.existsAsFile()
                               ? lastPositionsFile.getParentDirectory()
                               : getAutoSaveFile().getParentDirectory();
-    fileChooser = std::make_unique<FileChooser>("Save Circle Positions", startDir, "*.json");
+    fileChooser = std::make_unique<FileChooser>("Save Settings to...", startDir, "*.json");
     fileChooser->launchAsync(FileBrowserComponent::saveMode
                                  | FileBrowserComponent::canSelectFiles
                                  | FileBrowserComponent::warnAboutOverwriting,
@@ -266,7 +363,7 @@ void MidiVisuEditor::loadPositions()
     const File startDir = lastPositionsFile.existsAsFile()
                               ? lastPositionsFile.getParentDirectory()
                               : getAutoSaveFile().getParentDirectory();
-    fileChooser = std::make_unique<FileChooser>("Load Circle Positions", startDir, "*.json");
+    fileChooser = std::make_unique<FileChooser>("Load Settings", startDir, "*.json");
     fileChooser->launchAsync(FileBrowserComponent::openMode | FileBrowserComponent::canSelectFiles,
         [this](const FileChooser& fc)
         {
@@ -304,6 +401,9 @@ void MidiVisuEditor::timerCallback()
     static const String voiceNames[4] = { "Kick", "Clap", "Snare", "HH" };
     static constexpr int kDrumNotes[4] = { 48, 50, 52, 54 }; // C3, D3, E3, F#3 (JUCE octave numbering)
 
+    const float minR = (float)ballSizeSlider.getMinValue();
+    const float maxR = (float)ballSizeSlider.getMaxValue();
+
     // --- ch10: animation (per-voice) — instant snap up, smooth decay ---
     for (int v = 0; v < 4; ++v)
     {
@@ -311,9 +411,9 @@ void MidiVisuEditor::timerCallback()
         if (count != lastDrumHitCount[v])
         {
             lastDrumHitCount[v]   = count;
-            drumSmoothedRadius[v] = drumHitRadius; // instant peak
+            drumSmoothedRadius[v] = maxR; // instant peak
         }
-        drumSmoothedRadius[v] += (drumRestRadius - drumSmoothedRadius[v]) * drumSmoothing;
+        drumSmoothedRadius[v] += (minR - drumSmoothedRadius[v]) * drumSmoothing;
     }
     {
         const int count   = audioProcessor.ch10RawHitCount.load(std::memory_order_relaxed);
@@ -341,8 +441,8 @@ void MidiVisuEditor::timerCallback()
     {
         const int note = audioProcessor.channelHighestNote[i].load();
         const float target = (note >= 0)
-                                 ? (minRadius + (note / 127.0f) * (maxRadius - minRadius))
-                                 : minRadius;
+                                 ? (minR + (note / 127.0f) * (maxR - minR))
+                                 : minR;
         smoothedRadius[i] += (target - smoothedRadius[i]) * smoothing;
 
         const int count   = audioProcessor.channelNoteOnCount[i].load(std::memory_order_relaxed);
@@ -362,6 +462,103 @@ void MidiVisuEditor::timerCallback()
     {
         logLines.remove (logLines.size()  - 1);
         logColors.remove(logColors.size() - 1);
+    }
+
+    // MIDI clock kick — independent of float toggle.
+    static Random rng;
+    const bool floatActive = floatToggle.getToggleState();
+    const bool kickActive  = clockKickToggle.getToggleState();
+
+    const int clockNow = audioProcessor.midiClockPulse.load(std::memory_order_relaxed);
+    const int div      = clockDivisionBox.getSelectedId();
+    if (kickActive && div > 0 && clockNow / div > lastClockPulse / div)
+    {
+        const float kickStr = 8.0f * (float)clockKickIntensitySlider.getValue();
+        for (int i = 0; i < 7; ++i)
+        {
+            const float angle = rng.nextFloat() * MathConstants<float>::twoPi;
+            floatVel[i].x += std::cos(angle) * kickStr;
+            floatVel[i].y += std::sin(angle) * kickStr;
+        }
+    }
+    lastClockPulse = clockNow;
+
+    const bool collisionActive = collisionToggle.getToggleState();
+
+    if (floatActive || kickActive || collisionActive)
+    {
+        // Brownian force only when float is on.
+        const float intensity = floatActive ? (float)floatIntensitySlider.getValue() : 0.0f;
+        const float kForce   = 5.4f * intensity;
+        const float kDamping = 0.99f - (float)floatSpeedSlider.getValue() * 0.16f;
+
+        for (int i = 0; i < 7; ++i)
+        {
+            if (intensity > 0.0f)
+            {
+                floatVel[i].x += (rng.nextFloat() * 2.0f - 1.0f) * kForce;
+                floatVel[i].y += (rng.nextFloat() * 2.0f - 1.0f) * kForce;
+            }
+            floatVel[i]   *= kDamping;
+            floatOffset[i] += floatVel[i];
+        }
+
+        // Elastic collisions — radii match current visual size so MIDI-big balls push harder.
+        if (collisionActive)
+        {
+            float cr[7];
+            for (int v = 0; v < 4; ++v) cr[v] = jmax(minR, drumSmoothedRadius[v]);
+            for (int i = 1; i < 4; ++i) cr[3 + i] = jmax(minR, smoothedRadius[i]);
+
+            const float W = (float)getWidth();
+            const float H = (float)getHeight();
+
+            // Ball-wall
+            for (int i = 0; i < 7; ++i)
+            {
+                const float cx = circlePos[i].x + floatOffset[i].x;
+                const float cy = circlePos[i].y + floatOffset[i].y;
+                if (cx - cr[i] < 0.f)       { floatOffset[i].x += cr[i] - cx;       floatVel[i].x =  std::abs(floatVel[i].x); }
+                else if (cx + cr[i] > W)    { floatOffset[i].x -= cx + cr[i] - W;   floatVel[i].x = -std::abs(floatVel[i].x); }
+                if (cy - cr[i] < 0.f)       { floatOffset[i].y += cr[i] - cy;       floatVel[i].y =  std::abs(floatVel[i].y); }
+                else if (cy + cr[i] > H)    { floatOffset[i].y -= cy + cr[i] - H;   floatVel[i].y = -std::abs(floatVel[i].y); }
+            }
+
+            // Ball-ball (general elastic, prepared for unequal masses)
+            for (int i = 0; i < 7; ++i)
+            for (int j = i + 1; j < 7; ++j)
+            {
+                const float dx = (circlePos[j].x + floatOffset[j].x) - (circlePos[i].x + floatOffset[i].x);
+                const float dy = (circlePos[j].y + floatOffset[j].y) - (circlePos[i].y + floatOffset[i].y);
+                const float distSq = dx * dx + dy * dy;
+                const float minDist = cr[i] + cr[j];
+                if (distSq >= minDist * minDist || distSq < 0.0001f) continue;
+
+                const float dist = std::sqrt(distSq);
+                const float nx = dx / dist, ny = dy / dist;
+
+                const float dvn = (floatVel[i].x - floatVel[j].x) * nx
+                                + (floatVel[i].y - floatVel[j].y) * ny;
+                if (dvn > 0.f)
+                {
+                    const float mi = ballMass[i], mj = ballMass[j];
+                    const float imp = 2.f * dvn / (mi + mj);
+                    floatVel[i].x -= imp * mj * nx;  floatVel[i].y -= imp * mj * ny;
+                    floatVel[j].x += imp * mi * nx;  floatVel[j].y += imp * mi * ny;
+                }
+
+                // Positional correction: push apart so they no longer overlap.
+                const float half = (minDist - dist) * 0.5f;
+                floatOffset[i].x -= nx * half;  floatOffset[i].y -= ny * half;
+                floatOffset[j].x += nx * half;  floatOffset[j].y += ny * half;
+            }
+        }
+    }
+    else
+    {
+        // All off: snap circles to anchor immediately.
+        for (int i = 0; i < 7; ++i)
+            floatVel[i] = floatOffset[i] = {};
     }
 
     repaint();
@@ -426,7 +623,8 @@ void MidiVisuEditor::paint(Graphics& g)
     for (int v = 0; v < 4; ++v)
     {
         const float r  = drumSmoothedRadius[v];
-        const float cx = circlePos[v].x, cy = circlePos[v].y;
+        const float cx = circlePos[v].x + floatOffset[v].x;
+        const float cy = circlePos[v].y + floatOffset[v].y;
         g.setColour(drumColours[v]);
         g.fillEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f);
     }
@@ -434,7 +632,8 @@ void MidiVisuEditor::paint(Graphics& g)
     for (int i = 1; i < 4; ++i)
     {
         const float r  = smoothedRadius[i];
-        const float cx = circlePos[3 + i].x, cy = circlePos[3 + i].y;
+        const float cx = circlePos[3 + i].x + floatOffset[3 + i].x;
+        const float cy = circlePos[3 + i].y + floatOffset[3 + i].y;
         g.setColour(channelColours[i]);
         g.fillEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f);
     }
@@ -498,13 +697,53 @@ void MidiVisuEditor::paint(Graphics& g)
         g.drawText("Zoom",        px + pad, videoY + 122, logPanelWidth - pad * 2, 14, Justification::left);
         g.drawText("Opacity",     px + pad, videoY + 172, logPanelWidth - pad * 2, 14, Justification::left);
 
-        // Divider + CIRCLE POSITIONS section header
-        const int posY = videoY + 244;
+        // Divider + CIRCLES section header
+        const int circlesY = videoY + 244;
         g.setColour(Colour(0x30ffffff));
-        g.drawHorizontalLine(posY - 10, (float)(px + pad), (float)(getWidth() - pad));
+        g.drawHorizontalLine(circlesY - 10, (float)(px + pad), (float)(getWidth() - pad));
         g.setFont(monoFont);
         g.setColour(Colour(0x80ffffff));
-        g.drawText("CIRCLE POSITIONS", px + pad, posY, logPanelWidth - pad * 2, 16, Justification::left);
+        g.drawText("CIRCLES", px + pad, circlesY, logPanelWidth - pad * 2, 16, Justification::left);
+        g.setFont(monoFont);
+        g.setColour(Colour(0x60ffffff));
+        g.drawText("Size range", px + pad, circlesY + 18, logPanelWidth - pad * 2, 14, Justification::left);
+
+        // Handle position labels for the TwoValueHorizontal slider
+        {
+            const float sliderX   = (float)(px + pad);
+            const float sliderW   = (float)(logPanelWidth - pad * 2);
+            const float thumbR    = 10.f; // LookAndFeel4 thumb radius for height 28
+            const float trackW    = sliderW - 2.f * thumbR;
+            const float sMin = 5.f, sMax = 500.f, sRange = sMax - sMin;
+            const float minVal = (float)ballSizeSlider.getMinValue();
+            const float maxVal = (float)ballSizeSlider.getMaxValue();
+            const float minX = sliderX + thumbR + (minVal - sMin) / sRange * trackW;
+            const float maxX = sliderX + thumbR + (maxVal - sMin) / sRange * trackW;
+            g.setFont(monoFont);
+            g.setColour(Colours::white.withAlpha(0.8f));
+            g.drawText(String((int)minVal), (int)(minX - 15.f), circlesY + 66, 30, 14, Justification::centred, false);
+            g.drawText(String((int)maxVal), (int)(maxX - 15.f), circlesY + 66, 30, 14, Justification::centred, false);
+        }
+
+        // Divider + ANIMATION section header
+        const int animY = circlesY + 90;
+        g.setColour(Colour(0x30ffffff));
+        g.drawHorizontalLine(animY - 10, (float)(px + pad), (float)(getWidth() - pad));
+        g.setFont(monoFont);
+        g.setColour(Colour(0x80ffffff));
+        g.drawText("ANIMATION", px + pad, animY, logPanelWidth - pad * 2, 16, Justification::left);
+
+        g.setFont(monoFont);
+        g.setColour(Colour(0x60ffffff));
+        g.drawText("Clock sync",   px + pad, animY + 104, logPanelWidth - pad * 2, 14, Justification::left);
+        g.drawText("Kick amount",  px + pad, animY + 154, logPanelWidth - pad * 2, 14, Justification::left);
+        g.drawText("Intensity",    px + pad, animY + 204, logPanelWidth - pad * 2, 14, Justification::left);
+        g.drawText("Speed",        px + pad, animY + 254, logPanelWidth - pad * 2, 14, Justification::left);
+
+        // Divider above save/load buttons
+        const int btnsY = animY + 304;
+        g.setColour(Colour(0x30ffffff));
+        g.drawHorizontalLine(btnsY - 10, (float)(px + pad), (float)(getWidth() - pad));
     }
 }
 
@@ -588,11 +827,23 @@ void MidiVisuEditor::resized()
     videoOpacitySlider.setBounds(px + pad, videoY + 186, logPanelWidth - pad * 2, 28);
     loadVideoButton.setBounds  (px + pad, videoY + 214, logPanelWidth - pad * 2, 28);
 
-    const int posY = videoY + 244;
-    const int btnW = (logPanelWidth - pad * 3) / 2;
-    saveDefaultButton.setBounds  (px + pad,            posY + 22, logPanelWidth - pad * 2, 28);
-    savePositionsButton.setBounds(px + pad,            posY + 54, btnW, 28);
-    loadPositionsButton.setBounds(px + pad * 2 + btnW, posY + 54, btnW, 28);
+    const int circlesY = videoY + 244;
+    ballSizeSlider.setBounds(px + pad, circlesY + 34, logPanelWidth - pad * 2, 28);
+
+    const int animY = circlesY + 90;
+    floatToggle.setBounds              (px + pad, animY + 20,  logPanelWidth - pad * 2, 26);
+    collisionToggle.setBounds          (px + pad, animY + 46,  logPanelWidth - pad * 2, 26);
+    clockKickToggle.setBounds          (px + pad, animY + 72,  logPanelWidth - pad * 2, 26);
+    clockDivisionBox.setBounds         (px + pad, animY + 118, logPanelWidth - pad * 2, 24);
+    clockKickIntensitySlider.setBounds (px + pad, animY + 168, logPanelWidth - pad * 2, 28);
+    floatIntensitySlider.setBounds     (px + pad, animY + 218, logPanelWidth - pad * 2, 28);
+    floatSpeedSlider.setBounds         (px + pad, animY + 268, logPanelWidth - pad * 2, 28);
+
+    const int btnsY = animY + 304;
+    const int btnW  = (logPanelWidth - pad * 3) / 2;
+    saveDefaultButton.setBounds  (px + pad,            btnsY,      logPanelWidth - pad * 2, 28);
+    savePositionsButton.setBounds(px + pad,            btnsY + 34, btnW, 28);
+    loadPositionsButton.setBounds(px + pad * 2 + btnW, btnsY + 34, btnW, 28);
 }
 
 bool MidiVisuEditor::keyPressed(const KeyPress& key)
@@ -635,6 +886,14 @@ bool MidiVisuEditor::keyPressed(const KeyPress& key)
         loadPositionsButton.setVisible(optionsPanelOpen);
         loadVideoButton.setVisible(optionsPanelOpen);
         midiSettingsButton.setVisible(optionsPanelOpen);
+        ballSizeSlider.setVisible(optionsPanelOpen);
+        floatToggle.setVisible(optionsPanelOpen);
+        collisionToggle.setVisible(optionsPanelOpen);
+        clockKickToggle.setVisible(optionsPanelOpen);
+        clockDivisionBox.setVisible(optionsPanelOpen);
+        clockKickIntensitySlider.setVisible(optionsPanelOpen);
+        floatIntensitySlider.setVisible(optionsPanelOpen);
+        floatSpeedSlider.setVisible(optionsPanelOpen);
         if (optionsPanelOpen)
             resized();
         repaint();
@@ -681,10 +940,11 @@ void MidiVisuEditor::mouseDown(const MouseEvent& e)
     draggedCircle = -1;
     for (int i = 6; i >= 0; --i)
     {
-        const float r    = (i < 4) ? jmax(drumRestRadius, drumSmoothedRadius[i])
-                                   : jmax(minRadius,      smoothedRadius[i - 3]);
+        const float minR_ = (float)ballSizeSlider.getMinValue();
+        const float r     = (i < 4) ? jmax(minR_, drumSmoothedRadius[i])
+                                    : jmax(minR_, smoothedRadius[i - 3]);
         const float hitR = jmax(r, 30.0f);
-        if (e.position.getDistanceFrom(circlePos[i]) <= hitR)
+        if (e.position.getDistanceFrom(circlePos[i] + floatOffset[i]) <= hitR)
         {
             draggedCircle = i;
             dragOffset    = circlePos[i] - e.position;

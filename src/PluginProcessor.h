@@ -14,7 +14,7 @@
 //==============================================================================
 /**
 */
-class MidivisuAudioProcessor  : public juce::AudioProcessor
+class MidivisuAudioProcessor  : public AudioProcessor
 {
 public:
     //==============================================================================
@@ -29,14 +29,14 @@ public:
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
    #endif
 
-    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    void processBlock (AudioBuffer<float>&, MidiBuffer&) override;
 
     //==============================================================================
-    juce::AudioProcessorEditor* createEditor() override;
+    AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
 
     //==============================================================================
-    const juce::String getName() const override;
+    const String getName() const override;
 
     bool acceptsMidi() const override;
     bool producesMidi() const override;
@@ -47,11 +47,11 @@ public:
     int getNumPrograms() override;
     int getCurrentProgram() override;
     void setCurrentProgram (int index) override;
-    const juce::String getProgramName (int index) override;
-    void changeProgramName (int index, const juce::String& newName) override;
+    const String getProgramName (int index) override;
+    void changeProgramName (int index, const String& newName) override;
 
     //==============================================================================
-    void getStateInformation (juce::MemoryBlock& destData) override;
+    void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     // Highest active MIDI note per channel (indices 1-3 → MIDI ch 2-4), -1 = no notes held
@@ -73,6 +73,9 @@ public:
     // melodicMidiChannel[0..2]:   MIDI channel for melodic tracks 1-3 (default 2,3,4).
     std::atomic<int> drumVoiceMidiChannel[4];
     std::atomic<int> melodicMidiChannel[3];
+
+    // MIDI clock: counts every incoming clock pulse (24 per quarter note).
+    std::atomic<int> midiClockPulse { 0 };
 
 private:
     std::set<int> activeNotes[4]; // audio-thread only, indices 1-3 used

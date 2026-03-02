@@ -33,7 +33,7 @@ MidivisuAudioProcessor::~MidivisuAudioProcessor()
 }
 
 //==============================================================================
-const juce::String MidivisuAudioProcessor::getName() const
+const String MidivisuAudioProcessor::getName() const
 {
     return JucePlugin_Name;
 }
@@ -85,12 +85,12 @@ void MidivisuAudioProcessor::setCurrentProgram (int index)
 {
 }
 
-const juce::String MidivisuAudioProcessor::getProgramName (int index)
+const String MidivisuAudioProcessor::getProgramName (int index)
 {
     return {};
 }
 
-void MidivisuAudioProcessor::changeProgramName (int index, const juce::String& newName)
+void MidivisuAudioProcessor::changeProgramName (int index, const String& newName)
 {
 }
 
@@ -111,7 +111,7 @@ void MidivisuAudioProcessor::releaseResources()
 bool MidivisuAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
   #if JucePlugin_IsMidiEffect
-    juce::ignoreUnused (layouts);
+    ignoreUnused (layouts);
     return true;
   #else
     // This is the place where you check if the layout is supported.
@@ -135,7 +135,7 @@ bool MidivisuAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts)
 
 static const int kDrumNotes[4] = { 48, 50, 52, 54 }; // C3, D3, E3, F#3 (JUCE octave numbering)
 
-void MidivisuAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void MidivisuAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer& midiMessages)
 {
     // Snapshot channel assignments from UI thread.
     int drumCh[4], melCh[3];
@@ -147,6 +147,12 @@ void MidivisuAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
         const auto msg  = meta.getMessage();
         const int  ch   = msg.getChannel();
         const int  note = msg.getNoteNumber();
+
+        if (msg.isMidiClock())
+        {
+            midiClockPulse.fetch_add(1, std::memory_order_relaxed);
+            continue;
+        }
 
         // Drum voices — each voice has its own channel + fixed note.
         bool handledAsDrum = false;
@@ -190,13 +196,13 @@ bool MidivisuAudioProcessor::hasEditor() const
     return true; // (change this to false if you choose to not supply an editor)
 }
 
-juce::AudioProcessorEditor* MidivisuAudioProcessor::createEditor()
+AudioProcessorEditor* MidivisuAudioProcessor::createEditor()
 {
     return new MidiVisuEditor (*this);
 }
 
 //==============================================================================
-void MidivisuAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+void MidivisuAudioProcessor::getStateInformation (MemoryBlock& destData)
 {
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
@@ -211,7 +217,7 @@ void MidivisuAudioProcessor::setStateInformation (const void* data, int sizeInBy
 
 //==============================================================================
 // This creates new instances of the plugin..
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
+AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new MidivisuAudioProcessor();
 }
