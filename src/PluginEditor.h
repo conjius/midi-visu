@@ -105,8 +105,8 @@ private:
     Label voiceNameLabel[7];
     PassthroughComboBox voiceChannelBox[7];
     PassthroughComboBox clockDivisionBox;
-    ToggleButton videoToggle{"Video"};
-    ToggleButton blurToggle{"Blur"};
+    TextButton videoToggleButton{CharPointer_UTF8("\xf0\x9f\x91\x81")};   // 👁
+    TextButton blurToggleButton{CharPointer_UTF8("\xf0\x9f\x92\xa7")};   // 💧
     ToggleButton floatToggle{"Floating"};
     ToggleButton collisionToggle{" Collisions"};
     ToggleButton clockKickToggle{"Clock Sync"};

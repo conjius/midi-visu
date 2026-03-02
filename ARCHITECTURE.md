@@ -11,7 +11,7 @@ src/
 ├── UiManager.h/cpp                All painting and rendering
 ├── InteractionManager.h/cpp       Mouse and keyboard input handling
 ├── StyleManager.h/cpp             JUCE colour/font accessors and control styling
-├── StyleTokens.h                  Visual style constants (colours, font sizes)
+├── StyleTokens.h                  Visual style constants (colours, font sizes, layout spacing)
 ├── AppConstants.h                 Shared voice colours and display names
 ├── VideoBackground.h/mm           AVFoundation video decoder (Obj-C++)
 ├── VideoListManager.h/cpp         Video file list, selection, and play state
@@ -53,30 +53,36 @@ static methods to match a channel/note pair to a drum or melodic voice index.
 ### UI Thread
 
 **`MidiVisuEditor`** — Main editor component that runs a 60 Hz timer, owns all UI widgets
-and state, and delegates painting and input to dedicated managers.
+and state, and delegates painting and input to dedicated managers. Also implements
+`SeekBar::Listener` for video seek/loop callbacks.
 
 - Owns: `UiManager`, `InteractionManager`, `StyleManager`, `VideoBackground`,
   `VideoListManager`, `RangeSlider`, `SeekBar`, `OptionsPanelLayout`
 - Reads from: `MidivisuAudioProcessor` (via `audioProcessor` reference to access
   `MidiManager` / `VoiceManager` atomics)
+- Defines: `PassthroughComboBox` — `ComboBox` subclass that forwards mouse wheel events
+  to the parent instead of capturing them
 
 **`UiManager`** — Renders all visual elements (circles, log panel, options panel, video
 frame) by reading editor state as a friend class.
 
-- Uses: `MidiVisuEditor` (friend access), `AppConstants`, `StyleManager`
+- Uses: `MidiVisuEditor` (friend access), `AppConstants`, `StyleManager`,
+  `OptionsPanelLayout`, `StyleTokens`
 
 **`InteractionManager`** — Handles all keyboard shortcuts, mouse dragging of circles, and
 scroll events by mutating editor state as a friend class.
 
-- Uses: `MidiVisuEditor` (friend access)
+- Uses: `MidiVisuEditor` (friend access), `OptionsPanelLayout`
 
 **`StyleManager`** — JUCE-aware wrapper that converts `StyleTokens` constants into
 `Colour` and `Font` objects and applies dark styling to JUCE controls.
 
 - Uses: `StyleTokens`
 
-**`StyleTokens`** — Header-only namespace containing all visual style constants (ARGB
-colours, font sizes) with no JUCE dependency.
+**`StyleTokens`** — Header-only namespace containing all visual style constants: ARGB
+colours for panels, sliders, buttons, combo boxes, seek bar, and log; font sizes; and
+layout spacing constants (`kPadding`, `kRowHeight`, `kListRowHeight`, `kSliderHeight`,
+`kButtonHeight`, `kScrollbarW`, etc.).
 
 - Dependencies: none (no JUCE)
 
@@ -89,12 +95,14 @@ display names, and default channel assignments.
 
 **`VideoBackground`** — Decodes video frames via AVFoundation (Objective-C++) and exposes
 raw BGRA pixel buffers, deliberately avoiding any JUCE headers to prevent Objective-C type
-conflicts.
+conflicts. Provides playback control (`play`, `pause`, `stop`, `seek`), loop points
+(`setLoopPoints`), time queries (`currentTime`, `duration`), and a static `fileDuration`
+probe for files not yet loaded.
 
 - Dependencies: AVFoundation (macOS system framework)
 
-**`VideoListManager`** — Pure C++ class managing a list of video filenames, the selected
-index, and play/pause/stop state.
+**`VideoListManager`** — Pure C++ class managing a list of video file entries (filename +
+duration), the selected index, and play/pause/stop state.
 
 - Dependencies: none (no JUCE)
 
@@ -115,29 +123,33 @@ loop handles. Features:
 
 - **Click-to-seek**: clicking empty track area moves playhead to that position.
 - **Elapsed fill**: brighter track fill from 0 to the playhead position.
-- **Loop handles**: drawn as full-size edge markers (matching RangeSlider style) with
-  timestamp labels below. Draggable regardless of loop enabled state.
+- **Loop handles**: drawn as full-size edge markers with timestamp labels below.
+  Draggable regardless of loop enabled state.
 - **Loop toggle**: `setLoopEnabled(bool)` controls visual appearance — when disabled,
   loop handles and region are drawn greyed out but remain interactive.
+- **Listener interface**: `SeekBar::Listener` with `seekBarLoopChanged` and
+  `seekBarPlayheadDragged` callbacks.
+- Uses an internal `RangeSlider` as a visual-only element for loop handle rendering.
 - `kBarHeight = 40` (24px track area + 16px for loop time labels below).
 
-- Uses: `MultiHandleSliderLogic`
+- Uses: `MultiHandleSliderLogic`, `RangeSlider`
 
-**`MultiHandleSliderLogic`** — Pure C++ math for a three-handle slider: hit testing,
-handle dragging, middle-zone dragging, and time formatting.
+**`MultiHandleSliderLogic`** — Pure C++ math for a three-handle slider (loop start,
+playhead, loop end): hit testing, handle dragging, middle-zone dragging, and time
+formatting.
 
 - Dependencies: none (no JUCE)
 
 **`OptionsPanelLayout`** — Pure C++ layout engine that computes Y positions for all
 options panel sections given fold states and scroll offset.
 
-- Dependencies: none (no JUCE)
+- Uses: `StyleTokens` (for `kPadding`)
 
 ## Options panel layout
 
 Layout Y positions for the options panel are computed by `OptionsPanelLayout`
-(pure C++, no JUCE). Sections can be folded/expanded; the panel supports vertical
-scrolling with a thin scrollbar on the right side.
+(pure C++). Sections can be folded/expanded; the panel supports vertical scrolling
+with a thin scrollbar on the right side.
 
 **Sections** (in order): MIDI ROUTING, VIDEO, CIRCLES, ANIMATION.
 
@@ -151,14 +163,12 @@ scrolling with a thin scrollbar on the right side.
 - JUCE child Components are repositioned via `setBounds()` on each scroll/fold change;
   components scrolled outside the viewport are set invisible.
 
-## Log panel
+## Panel layout
 
-- Toggle with `L` key
-- 300px overlay on left side, newest entry first
-- `mouseWheelMove` for scrolling (deltaY * 30 lines)
-- Entries added continuously to `logLines` (StringArray, max 500) regardless of panel
-  open state
-- Scrollbar on the left side of the panel
+- **Log panel**: 300px overlay on the **left** side of the window. Scrollbar on the left
+  edge.
+- **Options panel**: 300px overlay on the **right** side of the window. Scrollbar on the
+  right edge.
 
 ## JUCE
 

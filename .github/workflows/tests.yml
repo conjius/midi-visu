@@ -28,10 +28,26 @@ jobs:
           git clone --depth 1 --branch 8.0.12 https://github.com/juce-framework/JUCE.git ../../Downloads/JUCE
 
       - name: Configure
-        run: cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug
+        run: cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="--coverage" -DCMAKE_C_FLAGS="--coverage"
 
       - name: Build tests
         run: cmake --build cmake-build-debug --target midi-visu-tests
 
       - name: Run tests
         run: cd cmake-build-debug && ctest --output-on-failure
+
+      - name: Generate coverage report
+        run: |
+          brew install lcov
+          lcov --capture --directory cmake-build-debug --output-file coverage.info \
+               --ignore-errors inconsistent
+          lcov --remove coverage.info '*/JUCE/*' '*/tests/*' '/usr/*' \
+               --output-file coverage.info --ignore-errors unused
+          lcov --list coverage.info
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.info
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}

@@ -185,7 +185,7 @@ bool InteractionManager::keyPressed(const KeyPress& key) const {
     }
 
     if (key == KeyPress('b', ModifierKeys::noModifiers, 0)) {
-        editor.blurToggle.setToggleState(!editor.blurToggle.getToggleState(),
+        editor.blurToggleButton.setToggleState(!editor.blurToggleButton.getToggleState(),
                                          dontSendNotification);
 
         editor.repaint();

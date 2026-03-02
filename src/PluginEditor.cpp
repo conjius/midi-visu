@@ -55,15 +55,17 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
         addChildComponent(voiceChannelBox[i]);
     }
 
-    videoToggle.setToggleState(true, dontSendNotification);
-    addChildComponent(videoToggle);
+    videoToggleButton.setClickingTogglesState(true);
+    videoToggleButton.setToggleState(true, dontSendNotification);
+    addChildComponent(videoToggleButton);
 
-    blurToggle.setToggleState(true, dontSendNotification);
+    blurToggleButton.setClickingTogglesState(true);
+    blurToggleButton.setToggleState(true, dontSendNotification);
     blurSlider.setRange(0.0, 40.0, 0.5);
     blurSlider.setValue(12.0, dontSendNotification);
     blurSlider.setSliderStyle(Slider::LinearHorizontal);
     blurSlider.setTextBoxStyle(Slider::TextBoxRight, false, 46, 20);
-    addChildComponent(blurToggle);
+    addChildComponent(blurToggleButton);
     addChildComponent(blurSlider);
 
     videoZoomSlider.setRange(1.0, 8.0, 0.1);
@@ -116,12 +118,12 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
     addChildComponent(floatIntensitySlider);
     addChildComponent(floatSpeedSlider);
 
-    videoToggle.onClick = [this] {
-        appendLog(videoToggle.getToggleState() ? "Video: ON" : "Video: OFF",
+    videoToggleButton.onClick = [this] {
+        appendLog(videoToggleButton.getToggleState() ? "Video: ON" : "Video: OFF",
                   styleManager.logInfo());
     };
-    blurToggle.onClick = [this] {
-        appendLog(blurToggle.getToggleState() ? "Blur: ON" : "Blur: OFF",
+    blurToggleButton.onClick = [this] {
+        appendLog(blurToggleButton.getToggleState() ? "Blur: ON" : "Blur: OFF",
                   styleManager.logInfo());
     };
     floatToggle.onClick = [this] {
@@ -221,10 +223,11 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
     ballSizeSlider.setScrollWheelEnabled(false);
     styleManager.applyToSlider(ballSizeSlider);
 
-    for (auto* b : {
-             &videoToggle, &blurToggle, &floatToggle, &collisionToggle, &clockKickToggle
-         })
+    for (auto* b : {&floatToggle, &collisionToggle, &clockKickToggle})
         styleManager.applyToToggleButton(*b);
+
+    for (auto* b : {&videoToggleButton, &blurToggleButton})
+        styleManager.applyToTextButton(*b);
 
     for (auto* b : {&logMidiNotesToggle, &logMidiClockToggle}) {
         styleManager.applyToToggleButton(*b);
@@ -377,8 +380,8 @@ void MidiVisuEditor::writePositionsToFile(const File& file) const {
     auto* settings = new DynamicObject();
     settings->setProperty("ballSizeMin", ballSizeSlider.getMinValue());
     settings->setProperty("ballSizeMax", ballSizeSlider.getMaxValue());
-    settings->setProperty("videoEnabled", videoToggle.getToggleState());
-    settings->setProperty("blurEnabled", blurToggle.getToggleState());
+    settings->setProperty("videoEnabled", videoToggleButton.getToggleState());
+    settings->setProperty("blurEnabled", blurToggleButton.getToggleState());
     settings->setProperty("blurRadius", blurSlider.getValue());
     settings->setProperty("videoZoom", videoZoomSlider.getValue());
     settings->setProperty("videoOpacity", videoOpacitySlider.getValue());
@@ -449,10 +452,10 @@ void MidiVisuEditor::readPositionsFromFile(const File& file) {
                                               (double)s->getProperty("ballSizeMax"),
                                               dontSendNotification);
         if (s->hasProperty("videoEnabled"))
-            videoToggle.setToggleState((bool)s->getProperty("videoEnabled"),
+            videoToggleButton.setToggleState((bool)s->getProperty("videoEnabled"),
                                        dontSendNotification);
         if (s->hasProperty("blurEnabled"))
-            blurToggle.setToggleState((bool)s->getProperty("blurEnabled"),
+            blurToggleButton.setToggleState((bool)s->getProperty("blurEnabled"),
                                       dontSendNotification);
         if (s->hasProperty("blurRadius"))
             blurSlider.setValue((double)s->getProperty("blurRadius"),
@@ -786,7 +789,7 @@ void MidiVisuEditor::timerCallback() {
     }
 
     // Sync seekbar playhead with video current time (skip while user is dragging)
-    if (videoToggle.getToggleState() && !seekBar.isDragging()) {
+    if (videoToggleButton.getToggleState() && !seekBar.isDragging()) {
         const double dur = videoBackground.duration();
         if (dur > 0.0) {
             seekBar.setMaxValue(dur);
@@ -834,8 +837,8 @@ void MidiVisuEditor::resized() {
         videoPlayPauseButton.setVisible(false);
         videoStopButton.setVisible(false);
         loopButton.setVisible(false);
-        videoToggle.setVisible(false);
-        blurToggle.setVisible(false);
+        videoToggleButton.setVisible(false);
+        blurToggleButton.setVisible(false);
         blurSlider.setVisible(false);
         videoZoomSlider.setVisible(false);
         videoOpacitySlider.setVisible(false);
@@ -889,31 +892,35 @@ void MidiVisuEditor::resized() {
 
     // ── VIDEO ────────────────────────────────────────────────────────────────
     if (!optionsLayout.isFolded(OptionsPanelLayout::Video)) {
-        const int seekY = optionsLayout.videoSeekBarY() - scroll;
+        // Transport buttons line: [play][stop][loop] ............. [eye][blur]
+        const int transY = optionsLayout.videoTransportY() - scroll;
         const int btnH = SeekBar::kTrackAreaHeight;
         const int btnGap = 2;
-        const int seekGap = 4;
-        const int btnsW = btnH * 3 + btnGap * 2 + seekGap;
-        place(videoPlayPauseButton, px + pad, seekY, btnH, btnH);
-        place(videoStopButton, px + pad + btnH + btnGap, seekY, btnH, btnH);
-        place(loopButton, px + pad + (btnH + btnGap) * 2, seekY, btnH, btnH);
-        place(seekBar, px + pad + btnsW, seekY, panelW - btnsW, SeekBar::kBarHeight);
+        place(videoPlayPauseButton, px + pad, transY, btnH, btnH);
+        place(videoStopButton, px + pad + btnH + btnGap, transY, btnH, btnH);
+        place(loopButton, px + pad + (btnH + btnGap) * 2, transY, btnH, btnH);
+        // Eye + blur buttons right-aligned on the same line
+        place(blurToggleButton, px + pad + panelW - btnH, transY, btnH, btnH);
+        place(videoToggleButton, px + pad + panelW - btnH * 2 - btnGap, transY,
+              btnH, btnH);
+
+        // Seekbar on its own line (full width)
+        const int seekY = optionsLayout.videoSeekBarY() - scroll;
+        place(seekBar, px + pad, seekY, panelW, SeekBar::kBarHeight);
 
         const int ctrlY = optionsLayout.videoCtrlY() - scroll;
-        place(videoToggle, px + pad, ctrlY, panelW, StyleTokens::kRowHeight);
-        place(blurToggle, px + pad, ctrlY + 26, panelW, StyleTokens::kRowHeight);
-        place(blurSlider, px + pad, ctrlY + 70, panelW, StyleTokens::kSliderHeight);
-        place(videoZoomSlider, px + pad, ctrlY + 124, panelW,
+        place(blurSlider, px + pad, ctrlY + 14, panelW, StyleTokens::kSliderHeight);
+        place(videoZoomSlider, px + pad, ctrlY + 54, panelW,
               StyleTokens::kSliderHeight);
-        place(videoOpacitySlider, px + pad, ctrlY + 178, panelW,
+        place(videoOpacitySlider, px + pad, ctrlY + 94, panelW,
               StyleTokens::kSliderHeight);
     } else {
         seekBar.setVisible(false);
         videoPlayPauseButton.setVisible(false);
         videoStopButton.setVisible(false);
         loopButton.setVisible(false);
-        videoToggle.setVisible(false);
-        blurToggle.setVisible(false);
+        videoToggleButton.setVisible(false);
+        blurToggleButton.setVisible(false);
         blurSlider.setVisible(false);
         videoZoomSlider.setVisible(false);
         videoOpacitySlider.setVisible(false);

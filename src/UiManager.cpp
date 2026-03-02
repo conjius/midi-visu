@@ -16,7 +16,7 @@ void UiManager::paint(Graphics& g) const {
     // ── Video ──────────────────────────────────────────────────────────────────
     int srcW = 0, srcH = 0, srcStride = 0;
     const uint8_t* srcPixels = nullptr;
-    if (editor.videoToggle.getToggleState()
+    if (editor.videoToggleButton.getToggleState()
         && editor.videoBackground.getLatestFrame(srcW, srcH, srcStride, srcPixels)) {
         if (!editor.videoFrame.isValid()
             || editor.videoFrame.getWidth() != srcW
@@ -44,7 +44,7 @@ void UiManager::paint(Graphics& g) const {
             }
         }
 
-        if (editor.blurToggle.getToggleState()) {
+        if (editor.blurToggleButton.getToggleState()) {
             const float r = (float)editor.blurSlider.getValue();
             if (r > 0.0f)
                 editor.videoFrame.getPixelData()->applyGaussianBlurEffect(r);
@@ -165,11 +165,11 @@ void UiManager::paint(Graphics& g) const {
                 const int ctrlY = layout.videoCtrlY() - scroll;
                 g.setFont(monoFont);
                 g.setColour(editor.styleManager.label());
-                g.drawText("Blur radius", px + pad, ctrlY + 56,
+                g.drawText("Blur radius", px + pad, ctrlY,
                            panelW - pad * 2, 14, Justification::left);
-                g.drawText("Zoom", px + pad, ctrlY + 110,
+                g.drawText("Zoom", px + pad, ctrlY + 42,
                            panelW - pad * 2, 14, Justification::left);
-                g.drawText("Opacity", px + pad, ctrlY + 164,
+                g.drawText("Opacity", px + pad, ctrlY + 82,
                            panelW - pad * 2, 14, Justification::left);
 
                 // FILES sub-section

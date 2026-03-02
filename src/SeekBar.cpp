@@ -19,7 +19,7 @@ void SeekBar::resized() {
     // Offset so the RangeSlider's track (which starts at its own kThumbRadius=10)
     // aligns with our track (which starts at kThumbRadius=8).
     const int off = static_cast<int>(RangeSlider::kThumbRadius - kThumbRadius);
-    loopSlider_.setBounds(-off, 0, getWidth() + 2 * off, kTrackAreaHeight);
+    loopSlider_.setBounds(-off, kTopZoneHeight, getWidth() + 2 * off, kTrackAreaHeight);
 }
 
 float SeekBar::getTrackStart() const { return kThumbRadius; }
@@ -82,7 +82,8 @@ void SeekBar::syncLoopSlider() {
 void SeekBar::paint(Graphics& g) {
     const float ts = getTrackStart();
     const float tw = getTrackWidth();
-    const float trackCY = static_cast<float>(kTrackAreaHeight) * 0.5f;
+    const float topZ = static_cast<float>(kTopZoneHeight);
+    const float trackCY = topZ + static_cast<float>(kTrackAreaHeight) * 0.5f;
     const float trackY = trackCY - 2.0f;
     const float trackH = 4.0f;
     const double maxVal = logic.maxValue();
@@ -102,21 +103,20 @@ void SeekBar::paint(Graphics& g) {
 
     const auto loopCol = Colour(StyleTokens::kSeekBarLoop);
     g.setColour(loopEnabled_ ? loopCol : loopCol.withMultipliedAlpha(0.3f));
-    g.fillRoundedRectangle(lsPx, trackY, lePx - lsPx, trackH, 2.0f);
-
-    // Loop region highlight above and below track (interval drag zones)
-    g.fillRoundedRectangle(lsPx, 0.0f, lePx - lsPx, trackY, 2.0f);
-    g.fillRoundedRectangle(lsPx, static_cast<float>(kTrackAreaHeight),
-                           lePx - lsPx, static_cast<float>(kLabelHeight), 2.0f);
+    // Blue zone above the track area
+    g.fillRoundedRectangle(lsPx, 0.0f, lePx - lsPx, topZ, 2.0f);
+    // Blue zone below the track area (label region)
+    const float belowY = topZ + static_cast<float>(kTrackAreaHeight);
+    g.fillRoundedRectangle(lsPx, belowY, lePx - lsPx,
+                           static_cast<float>(kLabelHeight), 2.0f);
 
     // Loop handles are drawn by loopSlider_ (JUCE blue thumbs)
 
     // Loop time labels below the track area, enclosed in the highlighted region.
-    // Left label left-aligned at lsPx, right label right-aligned at lePx.
     const auto labelCol = Colour(StyleTokens::kSeekBarTime);
     g.setColour(loopEnabled_ ? labelCol : labelCol.withMultipliedAlpha(0.3f));
     g.setFont(Font(FontOptions().withHeight(StyleTokens::kLabelSize)));
-    const int labelY = kTrackAreaHeight;
+    const int labelY = kTopZoneHeight + kTrackAreaHeight;
     const auto lsText = String(MultiHandleSliderLogic::formatTime(logic.loopStart()));
     const auto leText = String(MultiHandleSliderLogic::formatTime(logic.loopEnd()));
     const int labelW = 50;
@@ -136,7 +136,8 @@ void SeekBar::paintOverChildren(Graphics& g) {
 
     const float ts = getTrackStart();
     const float tw = getTrackWidth();
-    const float trackCY = static_cast<float>(kTrackAreaHeight) * 0.5f;
+    const float trackCY = static_cast<float>(kTopZoneHeight)
+                          + static_cast<float>(kTrackAreaHeight) * 0.5f;
     const float trackY = trackCY - 2.0f;
     const float trackH = 4.0f;
 
@@ -161,9 +162,11 @@ void SeekBar::paintOverChildren(Graphics& g) {
 void SeekBar::mouseDown(const MouseEvent& e) {
     const float mx = static_cast<float>(e.x);
 
-    const float trackCY = static_cast<float>(kTrackAreaHeight) * 0.5f;
-    const float trackY = trackCY - 2.0f;
-    if (e.y < trackY || e.y >= kTrackAreaHeight) {
+    const float trackCY = static_cast<float>(kTopZoneHeight)
+                          + static_cast<float>(kTrackAreaHeight) * 0.5f;
+    const float trackTop = static_cast<float>(kTopZoneHeight);
+    const float trackBottom = trackTop + static_cast<float>(kTrackAreaHeight);
+    if (e.y < trackTop || e.y >= trackBottom) {
         // Above track or label area: check loop handles first, then interval
         auto hit = logic.hitTest(mx, getTrackStart(), getTrackWidth(), kThumbRadius);
         if (hit == MultiHandleSliderLogic::HandleType::LoopStart

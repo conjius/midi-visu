@@ -103,20 +103,26 @@ int OptionsPanelLayout::midiRoutingFirstRowY() const {
 }
 
 // VIDEO content offsets (relative to VIDEO header Y)
-int OptionsPanelLayout::videoSeekBarY() const {
+// Transport buttons (play/pause, stop, loop, eye, blur) on first line.
+int OptionsPanelLayout::videoTransportY() const {
     return sectionHeaderY(Video) + 18;
 }
 
+// Seekbar on its own line below transport buttons.
+int OptionsPanelLayout::videoSeekBarY() const {
+    return sectionHeaderY(Video) + 46;
+}
+
 int OptionsPanelLayout::videoTimeLabelY() const {
-    return sectionHeaderY(Video) + 60;
+    return sectionHeaderY(Video) + 88;
 }
 
 int OptionsPanelLayout::videoCtrlY() const {
-    return sectionHeaderY(Video) + 78;
+    return sectionHeaderY(Video) + 106;
 }
 
 int OptionsPanelLayout::videoFilesY() const {
-    return videoCtrlY() + 210;
+    return videoCtrlY() + 134;
 }
 
 int OptionsPanelLayout::videoFileListTopY() const {

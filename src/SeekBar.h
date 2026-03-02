@@ -39,9 +39,10 @@ public:
     bool isDragging() const;
 
     static constexpr float kThumbRadius = 8.0f;
+    static constexpr int kTopZoneHeight = 8;    // blue drag zone above track
     static constexpr int kTrackAreaHeight = 24;
     static constexpr int kLabelHeight = 16;
-    static constexpr int kBarHeight = kTrackAreaHeight + kLabelHeight;
+    static constexpr int kBarHeight = kTopZoneHeight + kTrackAreaHeight + kLabelHeight;
 
 private:
     float getTrackStart() const;
