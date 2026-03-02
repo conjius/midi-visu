@@ -1,5 +1,84 @@
 # midi-visu — Architecture Notes
 
+## Class Descriptions and Dependencies
+
+### Audio Thread
+
+**`MidivisuAudioProcessor`** — Top-level JUCE audio processor that owns the voice and MIDI
+managers and delegates `processBlock` to `MidiManager`.
+
+- Owns: `VoiceManager`, `MidiManager`
+
+**`MidiManager`** — Processes incoming MIDI messages on the audio thread, updating atomic
+counters for drum hits, melodic note tracking, and clock pulses.
+
+- Uses: `VoiceManager` (to resolve channel/note → voice index)
+
+**`VoiceManager`** — Pure C++ class that stores MIDI channel assignments and provides
+static methods to match a channel/note pair to a drum or melodic voice index.
+
+- Dependencies: none (no JUCE)
+
+### UI Thread
+
+**`MidiVisuEditor`** — Main editor component that runs a 60 Hz timer, owns all UI widgets
+and state, and delegates painting and input to dedicated managers.
+
+- Owns: `DrawManager`, `InteractionManager`, `StyleManager`, `VideoBackground`,
+  `VideoListManager`, `RangeSlider`
+- Reads from: `MidivisuAudioProcessor` (via `audioProcessor` reference to access
+  `MidiManager` / `VoiceManager` atomics)
+
+**`DrawManager`** — Renders all visual elements (circles, log panel, options panel, video
+frame) by reading editor state as a friend class.
+
+- Uses: `MidiVisuEditor` (friend access), `AppConstants`, `StyleManager`
+
+**`InteractionManager`** — Handles all keyboard shortcuts, mouse dragging of circles, and
+scroll events by mutating editor state as a friend class.
+
+- Uses: `MidiVisuEditor` (friend access)
+
+**`StyleManager`** — JUCE-aware wrapper that converts `StyleTokens` constants into
+`Colour` and `Font` objects and applies dark styling to JUCE controls.
+
+- Uses: `StyleTokens`
+
+**`StyleTokens`** — Header-only namespace containing all visual style constants (ARGB
+colours, font sizes) with no JUCE dependency.
+
+- Dependencies: none (no JUCE)
+
+**`AppConstants`** — Header-only file defining shared voice colours, channel colours,
+display names, and default channel assignments.
+
+- Dependencies: JUCE (`Colour`)
+
+### Video
+
+**`VideoBackground`** — Decodes video frames via AVFoundation (Objective-C++) and exposes
+raw BGRA pixel buffers, deliberately avoiding any JUCE headers to prevent Objective-C type
+conflicts.
+
+- Dependencies: AVFoundation (macOS system framework)
+
+**`VideoListManager`** — Pure C++ class managing a list of video filenames, the selected
+index, and play/pause/stop state.
+
+- Dependencies: none (no JUCE)
+
+### Widgets
+
+**`RangeSlider`** — Custom JUCE slider subclass implementing a two-handle horizontal range
+control for setting min/max ball sizes.
+
+- Uses: `RangeSliderLogic`
+
+**`RangeSliderLogic`** — Pure C++ math utilities for value-to-pixel conversion,
+middle-zone hit testing, and clamped drag translation in a range slider.
+
+- Dependencies: none (no JUCE)
+
 ## JUCE
 
 - Location: `~/Downloads/JUCE` (added via `add_subdirectory` in CMakeLists.txt)
