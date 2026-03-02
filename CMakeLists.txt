@@ -29,15 +29,22 @@ juce_add_plugin(midi-visu
     IS_MIDI_EFFECT TRUE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     COPY_STEP TRUE
-    PLUGIN_CODE MDVIS
+    PLUGIN_CODE MDVI
     FORMATS VST3 AU Standalone
     PRODUCT_NAME "midi-visu")
 
 target_sources(midi-visu PRIVATE
-    Source/PluginProcessor.cpp
-    Source/PluginProcessor.h
-    Source/PluginEditor.cpp
-    Source/PluginEditor.h)
+    src/PluginProcessor.cpp
+    src/PluginProcessor.h
+    src/PluginEditor.cpp
+    src/PluginEditor.h
+    src/VideoBackground.mm
+    src/VideoBackground.h)
+
+# VideoBackground.mm uses AVFoundation ObjC objects stored as members — enable ARC
+# so they are properly retained/released without explicit retain/release calls.
+set_source_files_properties(src/VideoBackground.mm PROPERTIES
+    COMPILE_FLAGS "-fobjc-arc")
 
 target_compile_definitions(midi-visu
     PUBLIC
@@ -62,6 +69,7 @@ target_link_libraries(midi-visu PRIVATE
     juce::juce_gui_basics
     juce::juce_gui_extra
     juce::juce_midi_ci
-    juce::juce_opengl)
+    juce::juce_opengl
+    juce::juce_video)
 
 juce_generate_juce_header(midi-visu)

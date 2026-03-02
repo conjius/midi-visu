@@ -22,6 +22,10 @@ MidivisuAudioProcessor::MidivisuAudioProcessor()
                        )
 #endif
 {
+    for (int v = 0; v < 4; ++v) drumVoiceMidiChannel[v].store (10, std::memory_order_relaxed);
+    melodicMidiChannel[0].store (2, std::memory_order_relaxed);
+    melodicMidiChannel[1].store (3, std::memory_order_relaxed);
+    melodicMidiChannel[2].store (4, std::memory_order_relaxed);
 }
 
 MidivisuAudioProcessor::~MidivisuAudioProcessor()
@@ -129,32 +133,54 @@ bool MidivisuAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts)
 }
 #endif
 
+static const int kDrumNotes[4] = { 48, 50, 52, 54 }; // C3, D3, E3, F#3 (JUCE octave numbering)
+
 void MidivisuAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+    // Snapshot channel assignments from UI thread.
+    int drumCh[4], melCh[3];
+    for (int v = 0; v < 4; ++v) drumCh[v] = drumVoiceMidiChannel[v].load (std::memory_order_relaxed);
+    for (int i = 0; i < 3; ++i) melCh[i]  = melodicMidiChannel[i].load  (std::memory_order_relaxed);
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
-
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    for (const auto meta : midiMessages)
     {
-        auto* channelData = buffer.getWritePointer (channel);
+        const auto msg  = meta.getMessage();
+        const int  ch   = msg.getChannel();
+        const int  note = msg.getNoteNumber();
 
-        // ..do something to the data...
+        // Drum voices — each voice has its own channel + fixed note.
+        bool handledAsDrum = false;
+        if (msg.isNoteOn())
+        {
+            for (int v = 0; v < 4; ++v)
+            {
+                if (ch == drumCh[v] && note == kDrumNotes[v])
+                {
+                    ch10RawHitNote.store      (note, std::memory_order_relaxed);
+                    ch10RawHitCount.fetch_add (1,    std::memory_order_relaxed);
+                    drumVoiceHitCount[v].fetch_add (1, std::memory_order_relaxed);
+                    handledAsDrum = true;
+                    break;
+                }
+            }
+        }
+        if (handledAsDrum) continue;
+
+        // Melodic tracks — index 1-3 maps to melodicMidiChannel[0-2].
+        for (int i = 0; i < 3; ++i)
+        {
+            if (ch != melCh[i]) continue;
+            const int track = i + 1;
+            if (msg.isNoteOn())
+            {
+                activeNotes[track].insert (note);
+                channelNoteOnNote [track].store     (note, std::memory_order_relaxed);
+                channelNoteOnCount[track].fetch_add (1,    std::memory_order_relaxed);
+            }
+            else if (msg.isNoteOff())
+                activeNotes[track].erase (note);
+            channelHighestNote[track].store (activeNotes[track].empty() ? -1 : *activeNotes[track].rbegin());
+        }
     }
 }
 
@@ -166,7 +192,7 @@ bool MidivisuAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* MidivisuAudioProcessor::createEditor()
 {
-    return new MidivisuAudioProcessorEditor (*this);
+    return new MidiVisuEditor (*this);
 }
 
 //==============================================================================
