@@ -170,13 +170,13 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
         if (videoListManager.isPlaying()) {
             videoBackground.pause();
             videoListManager.setPlayState(VideoListManager::PlayState::Paused);
-            videoPlayPauseButton.setButtonText("Play");
+            videoPlayPauseButton.setButtonText(CharPointer_UTF8("\xe2\x96\xb6"));
             appendLog("Video: paused", styleManager.logInfo());
         }
         else {
             videoBackground.play();
             videoListManager.setPlayState(VideoListManager::PlayState::Playing);
-            videoPlayPauseButton.setButtonText("Pause");
+            videoPlayPauseButton.setButtonText(CharPointer_UTF8("\xe2\x8f\xb8"));
             appendLog("Video: playing", styleManager.logInfo());
         }
         repaint();
@@ -184,12 +184,31 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
     videoStopButton.onClick = [this] {
         videoBackground.stop();
         videoListManager.setPlayState(VideoListManager::PlayState::Stopped);
-        videoPlayPauseButton.setButtonText("Play");
+        videoPlayPauseButton.setButtonText(CharPointer_UTF8("\xe2\x96\xb6"));
         appendLog("Video: stopped", styleManager.logInfo());
         repaint();
     };
     addChildComponent(videoPlayPauseButton);
     addChildComponent(videoStopButton);
+
+    loopButton.onClick = [this] {
+        const bool nowOn = !seekBar.isLoopEnabled();
+        seekBar.setLoopEnabled(nowOn);
+        loopButton.setColour(TextButton::buttonColourId,
+                             Colour(nowOn ? StyleTokens::kButtonBgOn
+                                         : StyleTokens::kButtonBg));
+        if (nowOn)
+            videoBackground.setLoopPoints(seekBar.getLoopStart(),
+                                          seekBar.getLoopEnd());
+        else
+            videoBackground.setLoopPoints(0.0, videoBackground.duration());
+        writePositionsToFile(getAutoSaveFile());
+        repaint();
+    };
+    // Start with loop enabled — highlight the button
+    loopButton.setColour(TextButton::buttonColourId,
+                         Colour(StyleTokens::kButtonBgOn));
+    addChildComponent(loopButton);
 
     // Apply dark theme to all JUCE controls.
     for (auto* s : {
@@ -219,7 +238,7 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
 
     for (auto* b : {
              &saveDefaultButton, &savePositionsButton, &loadPositionsButton,
-             &videoPlayPauseButton, &videoStopButton, &midiSettingsButton
+             &videoPlayPauseButton, &videoStopButton, &loopButton, &midiSettingsButton
          })
         styleManager.applyToTextButton(*b);
 
@@ -250,7 +269,7 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
             const String oldName = voiceNames[i];
             voiceNames[i] = voiceNameLabel[i].getText();
             appendLog(oldName + " -> " + voiceNames[i], styleManager.logInfo());
-        };
+            };
         addChildComponent(voiceNameLabel[i]);
     }
 
@@ -272,32 +291,8 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
 
     setSize(1920, 1080);
     initDefaultPositions();
+    optionsPanelOpen = true;   // default for first run (overridden by saved state)
     readPositionsFromFile(getAutoSaveFile());
-
-    // Open options panel on startup
-    optionsPanelOpen = true;
-    for (auto& box : voiceChannelBox) box.setVisible(true);
-    videoToggle.setVisible(true);
-    blurToggle.setVisible(true);
-    blurSlider.setVisible(true);
-    videoZoomSlider.setVisible(true);
-    videoOpacitySlider.setVisible(true);
-    saveDefaultButton.setVisible(true);
-    savePositionsButton.setVisible(true);
-    loadPositionsButton.setVisible(true);
-    videoPlayPauseButton.setVisible(true);
-    videoStopButton.setVisible(true);
-    midiSettingsButton.setVisible(true);
-    ballSizeSlider.setVisible(true);
-    floatToggle.setVisible(true);
-    collisionToggle.setVisible(true);
-    clockKickToggle.setVisible(true);
-    clockDivisionBox.setVisible(true);
-    clockKickIntensitySlider.setVisible(true);
-    floatIntensitySlider.setVisible(true);
-    floatSpeedSlider.setVisible(true);
-    seekBar.setVisible(true);
-    for (auto& lbl : voiceNameLabel) lbl.setVisible(true);
     resized();
 
     startTimerHz(60);
@@ -355,9 +350,15 @@ void MidiVisuEditor::initDefaultPositions() {
 }
 
 File MidiVisuEditor::getAutoSaveFile() const {
-    return File::getSpecialLocation(File::userApplicationDataDirectory)
-           .getChildFile("MidiVisu")
-           .getChildFile("circle_positions.json");
+    auto dir = File::getSpecialLocation(File::userApplicationDataDirectory)
+                   .getChildFile("MidiVisu");
+    auto newFile = dir.getChildFile("settings.json");
+    if (!newFile.existsAsFile()) {
+        auto oldFile = dir.getChildFile("circle_positions.json");
+        if (oldFile.existsAsFile())
+            oldFile.moveFileTo(newFile);
+    }
+    return newFile;
 }
 
 void MidiVisuEditor::writePositionsToFile(const File& file) const {
@@ -388,6 +389,15 @@ void MidiVisuEditor::writePositionsToFile(const File& file) const {
     settings->setProperty("logMidiClock", logMidiClockToggle.getToggleState());
     settings->setProperty("loopStart", seekBar.getLoopStart());
     settings->setProperty("loopEnd", seekBar.getLoopEnd());
+    settings->setProperty("loopEnabled", seekBar.isLoopEnabled());
+    settings->setProperty("optionsPanelOpen", optionsPanelOpen);
+    settings->setProperty("logPanelOpen", logPanelOpen);
+
+    Array<var> foldArr;
+    for (int s = 0; s < OptionsPanelLayout::SectionCount; ++s)
+        foldArr.add(optionsLayout.isFolded(
+            static_cast<OptionsPanelLayout::Section>(s)));
+    settings->setProperty("foldStates", foldArr);
 
     Array<var> midiChArr;
     for (int i = 0; i < 7; ++i) midiChArr.add(voiceChannelBox[i].getSelectedId());
@@ -478,9 +488,29 @@ void MidiVisuEditor::readPositionsFromFile(const File& file) {
             logMidiClockToggle.setToggleState((bool)s->getProperty("logMidiClock"),
                                               dontSendNotification);
         if (s->hasProperty("loopStart"))
-            seekBar.setLoopStart((double)s->getProperty("loopStart"));
+            pendingLoopStart_ = (double)s->getProperty("loopStart");
         if (s->hasProperty("loopEnd"))
-            seekBar.setLoopEnd((double)s->getProperty("loopEnd"));
+            pendingLoopEnd_ = (double)s->getProperty("loopEnd");
+        if (s->hasProperty("loopEnabled")) {
+            const bool on = (bool)s->getProperty("loopEnabled");
+            seekBar.setLoopEnabled(on);
+            loopButton.setColour(TextButton::buttonColourId,
+                                 Colour(on ? StyleTokens::kButtonBgOn
+                                           : StyleTokens::kButtonBg));
+        }
+        if (s->hasProperty("optionsPanelOpen"))
+            optionsPanelOpen = (bool)s->getProperty("optionsPanelOpen");
+        if (s->hasProperty("logPanelOpen"))
+            logPanelOpen = (bool)s->getProperty("logPanelOpen");
+
+        if (auto* fArr = s->getProperty("foldStates").getArray())
+            for (int i = 0;
+                 i < jmin(static_cast<int>(OptionsPanelLayout::SectionCount),
+                          fArr->size());
+                 ++i)
+                optionsLayout.setFolded(
+                    static_cast<OptionsPanelLayout::Section>(i),
+                    (bool)fArr->getReference(i));
 
         if (auto* chArr = s->getProperty("voiceChannels").getArray())
             for (int i = 0; i < jmin(7, chArr->size()); ++i) {
@@ -509,12 +539,13 @@ void MidiVisuEditor::readPositionsFromFile(const File& file) {
                 if (f.existsAsFile()) {
                     lastVideoFile = f;
                     MessageManager::callAsync([this, path = f.getFullPathName()]() {
-                        videoBackground.setLoopPoints(seekBar.getLoopStart(),
-                                                      seekBar.getLoopEnd());
+                        if (seekBar.isLoopEnabled())
+                            videoBackground.setLoopPoints(seekBar.getLoopStart(),
+                                                          seekBar.getLoopEnd());
                         videoBackground.loadFile(path.toRawUTF8());
                         videoListManager.setPlayState(
                             VideoListManager::PlayState::Playing);
-                        videoPlayPauseButton.setButtonText("Pause");
+                        videoPlayPauseButton.setButtonText(CharPointer_UTF8("\xe2\x8f\xb8"));
                     });
                     videoRestored = true;
                 }
@@ -529,11 +560,12 @@ void MidiVisuEditor::readPositionsFromFile(const File& file) {
             if (vf.existsAsFile()) {
                 lastVideoFile = vf;
                 MessageManager::callAsync([this, path = vf.getFullPathName()]() {
-                    videoBackground.setLoopPoints(seekBar.getLoopStart(),
-                                                  seekBar.getLoopEnd());
+                    if (seekBar.isLoopEnabled())
+                        videoBackground.setLoopPoints(seekBar.getLoopStart(),
+                                                      seekBar.getLoopEnd());
                     videoBackground.loadFile(path.toRawUTF8());
                     videoListManager.setPlayState(VideoListManager::PlayState::Playing);
-                    videoPlayPauseButton.setButtonText("Pause");
+                    videoPlayPauseButton.setButtonText(CharPointer_UTF8("\xe2\x8f\xb8"));
                 });
             }
         }
@@ -754,6 +786,15 @@ void MidiVisuEditor::timerCallback() {
         const double dur = videoBackground.duration();
         if (dur > 0.0) {
             seekBar.setMaxValue(dur);
+            if (pendingLoopStart_ >= 0.0) {
+                seekBar.setLoopStart(pendingLoopStart_);
+                seekBar.setLoopEnd(pendingLoopEnd_);
+                if (seekBar.isLoopEnabled())
+                    videoBackground.setLoopPoints(pendingLoopStart_,
+                                                  pendingLoopEnd_);
+                pendingLoopStart_ = -1.0;
+                pendingLoopEnd_ = -1.0;
+            }
             seekBar.setPlayhead(videoBackground.currentTime());
         }
     }
@@ -763,90 +804,171 @@ void MidiVisuEditor::timerCallback() {
 
 //==============================================================================
 void MidiVisuEditor::resized() {
+    // ── Log panel widgets ────────────────────────────────────────────────────
     if (logPanelOpen) {
         const int lpad = 10;
         logMidiNotesToggle.setBounds(lpad, 54, logPanelWidth - lpad * 2, 24);
+        logMidiNotesToggle.setVisible(true);
         logMidiClockToggle.setBounds(lpad, 80, logPanelWidth - lpad * 2, 24);
+        logMidiClockToggle.setVisible(true);
         clearLogButton.setBounds(lpad, 112, logPanelWidth - lpad * 2, 22);
+        clearLogButton.setVisible(true);
+    } else {
+        logMidiNotesToggle.setVisible(false);
+        logMidiClockToggle.setVisible(false);
+        clearLogButton.setVisible(false);
     }
 
-    if (!optionsPanelOpen) return;
+    // ── Options panel widgets ────────────────────────────────────────────────
+    if (!optionsPanelOpen) {
+        for (auto& box : voiceChannelBox) box.setVisible(false);
+        for (auto& lbl : voiceNameLabel) lbl.setVisible(false);
+        midiSettingsButton.setVisible(false);
+        seekBar.setVisible(false);
+        videoPlayPauseButton.setVisible(false);
+        videoStopButton.setVisible(false);
+        loopButton.setVisible(false);
+        videoToggle.setVisible(false);
+        blurToggle.setVisible(false);
+        blurSlider.setVisible(false);
+        videoZoomSlider.setVisible(false);
+        videoOpacitySlider.setVisible(false);
+        ballSizeSlider.setVisible(false);
+        floatToggle.setVisible(false);
+        collisionToggle.setVisible(false);
+        clockKickToggle.setVisible(false);
+        clockDivisionBox.setVisible(false);
+        clockKickIntensitySlider.setVisible(false);
+        floatIntensitySlider.setVisible(false);
+        floatSpeedSlider.setVisible(false);
+        saveDefaultButton.setVisible(false);
+        savePositionsButton.setVisible(false);
+        loadPositionsButton.setVisible(false);
+        return;
+    }
 
+    optionsLayout.setViewportHeight(getHeight());
+    const int scroll = optionsLayout.scrollOffset();
     const int px = getWidth() - logPanelWidth;
     const int pad = 10;
+    const int panelW = logPanelWidth - pad * 2;
+    const int h = getHeight();
 
-    midiSettingsButton.setBounds(px + pad, 34, logPanelWidth - pad * 2, 26);
+    // Helper: position a component and set visible only if within viewport
+    auto place = [&](Component& c, int x, int y, int w, int ch) {
+        c.setBounds(x, y, w, ch);
+        c.setVisible(y + ch > 0 && y < h);
+    };
 
-    const int boxX = px + 110;
-    const int boxW = logPanelWidth - 110 - pad;
-    const int rowH = 26;
-    const int firstY = 88;
+    // Fixed header area (scrolls with content)
+    place(midiSettingsButton, px + pad,
+          OptionsPanelLayout::kMidiSettingsButtonY - scroll, panelW, 26);
 
-    for (int i = 0; i < 7; ++i)
-        voiceChannelBox[i].setBounds(boxX, firstY + i * rowH + 2, boxW, 22);
+    // ── MIDI ROUTING ─────────────────────────────────────────────────────────
+    if (!optionsLayout.isFolded(OptionsPanelLayout::MidiRouting)) {
+        const int firstY = optionsLayout.midiRoutingFirstRowY() - scroll;
+        const int boxX = px + 110;
+        const int boxW = logPanelWidth - 110 - pad;
+        const int rowH = 26;
+        for (int i = 0; i < 7; ++i) {
+            place(voiceChannelBox[i], boxX, firstY + i * rowH + 2, boxW, 22);
+            place(voiceNameLabel[i], px + pad + 14, firstY + i * rowH + 2, 82, 20);
+        }
+    } else {
+        for (int i = 0; i < 7; ++i) {
+            voiceChannelBox[i].setVisible(false);
+            voiceNameLabel[i].setVisible(false);
+        }
+    }
 
-    for (int i = 0; i < 7; ++i)
-        voiceNameLabel[i].setBounds(px + pad + 14, firstY + i * rowH + 2, 82, 20);
+    // ── VIDEO ────────────────────────────────────────────────────────────────
+    if (!optionsLayout.isFolded(OptionsPanelLayout::Video)) {
+        const int seekY = optionsLayout.videoSeekBarY() - scroll;
+        const int btnH = SeekBar::kTrackAreaHeight;
+        const int btnGap = 2;
+        const int seekGap = 4;
+        const int btnsW = btnH * 3 + btnGap * 2 + seekGap;
+        place(videoPlayPauseButton, px + pad, seekY, btnH, btnH);
+        place(videoStopButton, px + pad + btnH + btnGap, seekY, btnH, btnH);
+        place(loopButton, px + pad + (btnH + btnGap) * 2, seekY, btnH, btnH);
+        place(seekBar, px + pad + btnsW, seekY, panelW - btnsW, SeekBar::kBarHeight);
 
-    const int videoY = firstY + 7 * rowH + StyleTokens::kSectionGap;
+        const int ctrlY = optionsLayout.videoCtrlY() - scroll;
+        place(videoToggle, px + pad, ctrlY, panelW, StyleTokens::kRowHeight);
+        place(blurToggle, px + pad, ctrlY + 26, panelW, StyleTokens::kRowHeight);
+        place(blurSlider, px + pad, ctrlY + 70, panelW, StyleTokens::kSliderHeight);
+        place(videoZoomSlider, px + pad, ctrlY + 124, panelW,
+              StyleTokens::kSliderHeight);
+        place(videoOpacitySlider, px + pad, ctrlY + 178, panelW,
+              StyleTokens::kSliderHeight);
+    } else {
+        seekBar.setVisible(false);
+        videoPlayPauseButton.setVisible(false);
+        videoStopButton.setVisible(false);
+        loopButton.setVisible(false);
+        videoToggle.setVisible(false);
+        blurToggle.setVisible(false);
+        blurSlider.setVisible(false);
+        videoZoomSlider.setVisible(false);
+        videoOpacitySlider.setVisible(false);
+    }
 
-    // Seekbar at top of VIDEO section
-    seekBar.setBounds(px + pad, videoY + 18, logPanelWidth - pad * 2,
-                      SeekBar::kBarHeight);
+    // ── CIRCLES ──────────────────────────────────────────────────────────────
+    if (!optionsLayout.isFolded(OptionsPanelLayout::Circles)) {
+        place(ballSizeSlider, px + pad,
+              optionsLayout.circlesSliderY() - scroll, panelW,
+              StyleTokens::kSliderHeight);
+    } else {
+        ballSizeSlider.setVisible(false);
+    }
 
-    // Play/Stop buttons below time label
-    const int halfW = (logPanelWidth - pad * 3) / 2;
-    videoPlayPauseButton.setBounds(px + pad, videoY + 62, halfW,
-                                   StyleTokens::kButtonHeight);
-    videoStopButton.setBounds(px + pad * 2 + halfW, videoY + 62, halfW,
-                              StyleTokens::kButtonHeight);
+    // ── ANIMATION ────────────────────────────────────────────────────────────
+    if (!optionsLayout.isFolded(OptionsPanelLayout::Animation)) {
+        place(floatToggle, px + pad,
+              optionsLayout.animFloatToggleY() - scroll, panelW,
+              StyleTokens::kRowHeight);
+        place(collisionToggle, px + pad,
+              optionsLayout.animCollisionToggleY() - scroll, panelW,
+              StyleTokens::kRowHeight);
+        place(clockKickToggle, px + pad,
+              optionsLayout.animClockToggleY() - scroll, panelW,
+              StyleTokens::kRowHeight);
+        place(clockDivisionBox, px + pad,
+              optionsLayout.animClockDivY() - scroll, panelW, 24);
+        place(clockKickIntensitySlider, px + pad,
+              optionsLayout.animClockKickSliderY() - scroll, panelW,
+              StyleTokens::kSliderHeight);
+        place(floatIntensitySlider, px + pad,
+              optionsLayout.animFloatIntensitySliderY() - scroll, panelW,
+              StyleTokens::kSliderHeight);
+        place(floatSpeedSlider, px + pad,
+              optionsLayout.animFloatSpeedSliderY() - scroll, panelW,
+              StyleTokens::kSliderHeight);
+    } else {
+        floatToggle.setVisible(false);
+        collisionToggle.setVisible(false);
+        clockKickToggle.setVisible(false);
+        clockDivisionBox.setVisible(false);
+        clockKickIntensitySlider.setVisible(false);
+        floatIntensitySlider.setVisible(false);
+        floatSpeedSlider.setVisible(false);
+    }
 
-    // Toggles and sliders below buttons
-    const int ctrlY = videoY + 96;
-    videoToggle.setBounds(px + pad, ctrlY, logPanelWidth - pad * 2,
-                          StyleTokens::kRowHeight);
-    blurToggle.setBounds(px + pad, ctrlY + 26, logPanelWidth - pad * 2,
-                         StyleTokens::kRowHeight);
-    blurSlider.setBounds(px + pad, ctrlY + 70, logPanelWidth - pad * 2,
-                         StyleTokens::kSliderHeight);
-    videoZoomSlider.setBounds(px + pad, ctrlY + 124, logPanelWidth - pad * 2,
-                              StyleTokens::kSliderHeight);
-    videoOpacitySlider.setBounds(px + pad, ctrlY + 178, logPanelWidth - pad * 2,
-                                 StyleTokens::kSliderHeight);
-
-    // File list is custom-drawn; circles section below it
-    const int filesY = ctrlY + 210;
-    const int circlesY = filesY + 76;
-    ballSizeSlider.setBounds(px + pad, circlesY + 34, logPanelWidth - pad * 2,
-                             StyleTokens::kSliderHeight);
-
-    const int animY = circlesY + 90;
-    floatToggle.setBounds(px + pad, animY + 20, logPanelWidth - pad * 2,
-                          StyleTokens::kRowHeight);
-    collisionToggle.setBounds(px + pad, animY + 46, logPanelWidth - pad * 2,
-                              StyleTokens::kRowHeight);
-    clockKickToggle.setBounds(px + pad, animY + 72, logPanelWidth - pad * 2,
-                              StyleTokens::kRowHeight);
-    clockDivisionBox.setBounds(px + pad, animY + 118, logPanelWidth - pad * 2, 24);
-    clockKickIntensitySlider.setBounds(px + pad, animY + 168, logPanelWidth - pad * 2,
-                                       StyleTokens::kSliderHeight);
-    floatIntensitySlider.setBounds(px + pad, animY + 218, logPanelWidth - pad * 2,
-                                   StyleTokens::kSliderHeight);
-    floatSpeedSlider.setBounds(px + pad, animY + 268, logPanelWidth - pad * 2,
-                               StyleTokens::kSliderHeight);
-
-    const int btnsY = animY + 304;
+    // ── BUTTONS (always visible) ─────────────────────────────────────────────
+    const int btnsY = optionsLayout.buttonsY() - scroll;
     const int btnW = (logPanelWidth - pad * 3) / 2;
-    saveDefaultButton.setBounds(px + pad, btnsY, logPanelWidth - pad * 2,
-                                StyleTokens::kSliderHeight);
-    savePositionsButton.setBounds(px + pad, btnsY + 34, btnW, StyleTokens::kSliderHeight);
-    loadPositionsButton.setBounds(px + pad * 2 + btnW, btnsY + 34, btnW,
-                                  StyleTokens::kSliderHeight);
+    place(saveDefaultButton, px + pad, btnsY, panelW, StyleTokens::kSliderHeight);
+    place(savePositionsButton, px + pad, btnsY + 34, btnW, StyleTokens::kSliderHeight);
+    place(loadPositionsButton, px + pad * 2 + btnW, btnsY + 34, btnW,
+          StyleTokens::kSliderHeight);
 }
 
 //==============================================================================
 void MidiVisuEditor::seekBarLoopChanged(SeekBar* bar) {
-    videoBackground.setLoopPoints(bar->getLoopStart(), bar->getLoopEnd());
+    if (bar->isLoopEnabled())
+        videoBackground.setLoopPoints(bar->getLoopStart(), bar->getLoopEnd());
+    else
+        videoBackground.setLoopPoints(0.0, videoBackground.duration());
 }
 
 void MidiVisuEditor::seekBarPlayheadDragged(SeekBar* bar) {

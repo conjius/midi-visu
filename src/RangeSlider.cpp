@@ -50,3 +50,11 @@ void RangeSlider::mouseUp(const juce::MouseEvent& e) {
         juce::Slider::mouseUp(e);
     }
 }
+
+void RangeSlider::mouseWheelMove(const juce::MouseEvent& e,
+                                 const juce::MouseWheelDetails& w) {
+    if (!isMouseButtonDown()) return;
+    auto reversed = w;
+    reversed.deltaY = -reversed.deltaY;
+    juce::Slider::mouseWheelMove(e, reversed);
+}

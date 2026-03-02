@@ -18,5 +18,8 @@ public:
     void paintOverChildren(Graphics& g) const;
 
 private:
+    void drawSectionHeader(Graphics& g, const String& text, int px, int y,
+                           bool folded) const;
+
     MidiVisuEditor& editor;
 };

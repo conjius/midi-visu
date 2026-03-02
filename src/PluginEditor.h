@@ -17,6 +17,19 @@
 #include "RangeSlider.h"
 #include "VideoListManager.h"
 #include "SeekBar.h"
+#include "OptionsPanelLayout.h"
+
+class InvertedSlider : public Slider {
+public:
+    using Slider::Slider;
+    void mouseWheelMove(const MouseEvent& e,
+                        const MouseWheelDetails& w) override {
+        if (!isMouseButtonDown()) return;
+        auto reversed = w;
+        reversed.deltaY = -reversed.deltaY;
+        Slider::mouseWheelMove(e, reversed);
+    }
+};
 
 //==============================================================================
 class MidiVisuEditor : public AudioProcessorEditor,
@@ -104,18 +117,19 @@ private:
     ToggleButton logMidiClockToggle{"MIDI clock"};
     TextButton clearLogButton{"Clear"};
 
-    Slider blurSlider;
-    Slider videoZoomSlider;
-    Slider videoOpacitySlider;
+    InvertedSlider blurSlider;
+    InvertedSlider videoZoomSlider;
+    InvertedSlider videoOpacitySlider;
     RangeSlider ballSizeSlider;
-    Slider floatIntensitySlider;
-    Slider floatSpeedSlider;
-    Slider clockKickIntensitySlider;
+    InvertedSlider floatIntensitySlider;
+    InvertedSlider floatSpeedSlider;
+    InvertedSlider clockKickIntensitySlider;
     TextButton saveDefaultButton{"Save Settings"};
     TextButton savePositionsButton{"Save Settings to..."};
     TextButton loadPositionsButton{"Load"};
-    TextButton videoPlayPauseButton{"Play"};
-    TextButton videoStopButton{"Stop"};
+    TextButton videoPlayPauseButton{CharPointer_UTF8("\xe2\x96\xb6")};       // ▶
+    TextButton videoStopButton{CharPointer_UTF8("\xe2\x96\xa0")};           // ■
+    TextButton loopButton{CharPointer_UTF8("\xe2\x86\xbb")};               // ↻
     TextButton midiSettingsButton{"Audio / MIDI Settings"};
     SeekBar seekBar;
 
@@ -124,12 +138,19 @@ private:
 
     void showJuceAudioSettings();
 
+    // Options panel layout — fold state and scroll offset.
+    OptionsPanelLayout optionsLayout;
+
     // Style — declared before interaction/draw managers so they can access it.
     StyleManager styleManager;
 
     // Interaction and drawing managers — declared after all state they reference.
     InteractionManager interactionManager;
     UiManager uiManager;
+
+    // Pending loop values from settings, applied after maxValue becomes positive.
+    double pendingLoopStart_ = -1.0;
+    double pendingLoopEnd_ = -1.0;
 
     friend class InteractionManager;
     friend class UiManager;

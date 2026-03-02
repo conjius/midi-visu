@@ -101,6 +101,16 @@ public:
             expectWithinAbsoluteError(logic.loopEnd(), 50.0, 1e-9);
         }
 
+        beginTest("setMaxValue - expands loopEnd from zero");
+        {
+            MultiHandleSliderLogic logic; // default maxValue=0
+            expectWithinAbsoluteError(logic.loopEnd(), 0.0, 1e-9);
+            logic.setMaxValue(120.0);
+            // loopEnd should expand to the new max
+            expectWithinAbsoluteError(logic.loopEnd(), 120.0, 1e-9);
+            expectWithinAbsoluteError(logic.loopStart(), 0.0, 1e-9);
+        }
+
         beginTest("setMaxValue - clamps loopStart too");
         {
             MultiHandleSliderLogic logic(100.0);

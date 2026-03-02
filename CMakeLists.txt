@@ -61,7 +61,9 @@ target_sources(midi-visu PRIVATE
         src/MultiHandleSliderLogic.cpp
         src/MultiHandleSliderLogic.h
         src/SeekBar.cpp
-        src/SeekBar.h)
+        src/SeekBar.h
+        src/OptionsPanelLayout.cpp
+        src/OptionsPanelLayout.h)
 
 # VideoBackground.mm uses AVFoundation ObjC objects stored as members — enable ARC
 # so they are properly retained/released without explicit retain/release calls.
@@ -112,6 +114,7 @@ target_sources(midi-visu-tests PRIVATE
         tests/StyleTokensTests.cpp
         tests/VideoListManagerTests.cpp
         tests/MultiHandleSliderLogicTests.cpp
+        tests/OptionsPanelLayoutTests.cpp
         src/VoiceManager.cpp
         src/VoiceManager.h
         src/MidiManager.cpp
@@ -122,7 +125,9 @@ target_sources(midi-visu-tests PRIVATE
         src/VideoListManager.cpp
         src/VideoListManager.h
         src/MultiHandleSliderLogic.cpp
-        src/MultiHandleSliderLogic.h)
+        src/MultiHandleSliderLogic.h
+        src/OptionsPanelLayout.cpp
+        src/OptionsPanelLayout.h)
 
 target_include_directories(midi-visu-tests PRIVATE src)
 

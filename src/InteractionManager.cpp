@@ -1,5 +1,6 @@
 #include "InteractionManager.h"
 #include "PluginEditor.h"
+#include "OptionsPanelLayout.h"
 
 #if JUCE_STANDALONE_APPLICATION
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
@@ -14,40 +15,57 @@ InteractionManager::InteractionManager(MidiVisuEditor& e)
 void InteractionManager::mouseDown(const MouseEvent& e) {
     draggedCircle = -1;
 
-    // Video list click — must be checked before the circle drag loop
     if (editor.optionsPanelOpen) {
-        const int rowH_grid = 26, firstY = 88;
-        const int videoY = firstY + 7 * rowH_grid + 20;
-        const int ctrlY = videoY + 96;
-        const int filesY = ctrlY + 210;
-        const int listTop = filesY + 16;
-        const int listH = 2 * 22;
         const int pxPanel = editor.getWidth() - editor.logPanelWidth;
         const int pad = 10;
-        const int listL = pxPanel + pad;
-        const int listW = editor.logPanelWidth - pad * 2;
 
-        if (e.x >= listL && e.x < listL + listW
-            && e.y >= listTop && e.y < listTop + listH) {
-            const int row = (e.y - listTop) / 22;
-            const int fileIdx = editor.videoListScrollOffset + row;
-            if (fileIdx < editor.videoListManager.fileCount()) {
-                editor.videoListManager.setSelectedIndex(fileIdx);
-                const juce::File f = editor.assetsVideoDir.getChildFile(
-                    juce::String(editor.videoListManager.filename(fileIdx)));
-                if (f.existsAsFile()) {
-                    editor.videoBackground.setLoopPoints(
-                        editor.seekBar.getLoopStart(), editor.seekBar.getLoopEnd());
-                    editor.videoBackground.loadFile(f.getFullPathName().toRawUTF8());
-                    editor.lastVideoFile = f;
-                    editor.videoListManager.setPlayState(
-                        VideoListManager::PlayState::Playing);
-                    editor.videoPlayPauseButton.setButtonText("Pause");
-                    editor.writePositionsToFile(editor.getAutoSaveFile());
-                }
+        if (e.x >= pxPanel && e.x < editor.getWidth()) {
+            const auto& layout = editor.optionsLayout;
+
+            // Section header click — toggle fold
+            const int contentY = e.y + layout.scrollOffset();
+            auto section = layout.hitTestHeader(contentY);
+            if (section != OptionsPanelLayout::SectionCount) {
+                editor.optionsLayout.toggleFolded(section);
+
+                editor.resized();
                 editor.repaint();
+                return;
             }
-            return;
+
+            // Video file list click
+            if (!layout.isFolded(OptionsPanelLayout::Video)) {
+                const int listTop = layout.videoFileListTopY() - layout.scrollOffset();
+                const int listH = 2 * 22;
+                const int listL = pxPanel + pad;
+                const int listW = editor.logPanelWidth - pad * 2;
+
+                if (e.x >= listL && e.x < listL + listW
+                    && e.y >= listTop && e.y < listTop + listH) {
+                    const int row = (e.y - listTop) / 22;
+                    const int fileIdx = editor.videoListScrollOffset + row;
+                    if (fileIdx < editor.videoListManager.fileCount()) {
+                        editor.videoListManager.setSelectedIndex(fileIdx);
+                        const File f = editor.assetsVideoDir.getChildFile(
+                            String(editor.videoListManager.filename(fileIdx)));
+                        if (f.existsAsFile()) {
+                            if (editor.seekBar.isLoopEnabled())
+                                editor.videoBackground.setLoopPoints(
+                                    editor.seekBar.getLoopStart(),
+                                    editor.seekBar.getLoopEnd());
+                            editor.videoBackground.loadFile(
+                                f.getFullPathName().toRawUTF8());
+                            editor.lastVideoFile = f;
+                            editor.videoListManager.setPlayState(
+                                VideoListManager::PlayState::Playing);
+                            editor.videoPlayPauseButton.setButtonText(CharPointer_UTF8("\xe2\x8f\xb8"));
+                            editor.writePositionsToFile(editor.getAutoSaveFile());
+                        }
+                        editor.repaint();
+                    }
+                    return;
+                }
+            }
         }
     }
 
@@ -81,25 +99,34 @@ void InteractionManager::mouseUp(const MouseEvent& /*e*/) {
 
 void InteractionManager::mouseWheelMove(const MouseEvent& e,
                                         const MouseWheelDetails& w) const {
-    // Video list scroll
     if (editor.optionsPanelOpen) {
-        const int rowH_grid = 26, firstY = 88;
-        const int videoY = firstY + 7 * rowH_grid + 20;
-        const int ctrlY = videoY + 96;
-        const int filesY = ctrlY + 210;
-        const int listTop = filesY + 16;
-        const int listH = 2 * 22;
         const int pxPanel = editor.getWidth() - editor.logPanelWidth;
         const int pad = 10;
-        const int listL = pxPanel + pad;
-        const int listW = editor.logPanelWidth - pad * 2;
 
-        if (e.x >= listL && e.x < listL + listW
-            && e.y >= listTop && e.y < listTop + listH) {
-            const int maxOff = jmax(0, editor.videoListManager.fileCount() - 2);
-            editor.videoListScrollOffset -= roundToInt(w.deltaY * 3.0f);
-            editor.videoListScrollOffset =
-                jlimit(0, maxOff, editor.videoListScrollOffset);
+        if (e.x >= pxPanel && e.x < editor.getWidth()) {
+            const auto& layout = editor.optionsLayout;
+
+            // Video file list scroll (only when Video section is expanded)
+            if (!layout.isFolded(OptionsPanelLayout::Video)) {
+                const int listTop = layout.videoFileListTopY() - layout.scrollOffset();
+                const int listH = 2 * 22;
+                const int listL = pxPanel + pad;
+                const int listW = editor.logPanelWidth - pad * 2;
+
+                if (e.x >= listL && e.x < listL + listW
+                    && e.y >= listTop && e.y < listTop + listH) {
+                    const int maxOff = jmax(0, editor.videoListManager.fileCount() - 2);
+                    editor.videoListScrollOffset -= roundToInt(w.deltaY * 3.0f);
+                    editor.videoListScrollOffset =
+                        jlimit(0, maxOff, editor.videoListScrollOffset);
+                    editor.repaint();
+                    return;
+                }
+            }
+
+            // Options panel scroll
+            editor.optionsLayout.scrollBy(-roundToInt(w.deltaY * 40.0f));
+            editor.resized();
             editor.repaint();
             return;
         }
@@ -134,72 +161,18 @@ bool InteractionManager::keyPressed(const KeyPress& key) const {
         const bool anyOpen = editor.optionsPanelOpen || editor.logPanelOpen;
 
         // Close all panels
-        if (editor.optionsPanelOpen) {
-            editor.optionsPanelOpen = false;
-            for (auto& box : editor.voiceChannelBox) box.setVisible(false);
-            for (auto& lbl : editor.voiceNameLabel) lbl.setVisible(false);
-            editor.videoToggle.setVisible(false);
-            editor.blurToggle.setVisible(false);
-            editor.blurSlider.setVisible(false);
-            editor.videoZoomSlider.setVisible(false);
-            editor.videoOpacitySlider.setVisible(false);
-            editor.saveDefaultButton.setVisible(false);
-            editor.savePositionsButton.setVisible(false);
-            editor.loadPositionsButton.setVisible(false);
-            editor.videoPlayPauseButton.setVisible(false);
-            editor.videoStopButton.setVisible(false);
-            editor.midiSettingsButton.setVisible(false);
-            editor.ballSizeSlider.setVisible(false);
-            editor.floatToggle.setVisible(false);
-            editor.collisionToggle.setVisible(false);
-            editor.clockKickToggle.setVisible(false);
-            editor.clockDivisionBox.setVisible(false);
-            editor.clockKickIntensitySlider.setVisible(false);
-            editor.floatIntensitySlider.setVisible(false);
-            editor.floatSpeedSlider.setVisible(false);
-            editor.seekBar.setVisible(false);
-        }
-        if (editor.logPanelOpen) {
-            editor.logPanelOpen = false;
-            editor.logMidiNotesToggle.setVisible(false);
-            editor.logMidiClockToggle.setVisible(false);
-            editor.clearLogButton.setVisible(false);
-        }
+        editor.optionsPanelOpen = false;
+        editor.logPanelOpen = false;
 
         // If nothing was open, open both panels
         if (!anyOpen) {
             editor.optionsPanelOpen = true;
-            for (auto& box : editor.voiceChannelBox) box.setVisible(true);
-            for (auto& lbl : editor.voiceNameLabel) lbl.setVisible(true);
-            editor.videoToggle.setVisible(true);
-            editor.blurToggle.setVisible(true);
-            editor.blurSlider.setVisible(true);
-            editor.videoZoomSlider.setVisible(true);
-            editor.videoOpacitySlider.setVisible(true);
-            editor.saveDefaultButton.setVisible(true);
-            editor.savePositionsButton.setVisible(true);
-            editor.loadPositionsButton.setVisible(true);
-            editor.videoPlayPauseButton.setVisible(true);
-            editor.videoStopButton.setVisible(true);
-            editor.midiSettingsButton.setVisible(true);
-            editor.ballSizeSlider.setVisible(true);
-            editor.floatToggle.setVisible(true);
-            editor.collisionToggle.setVisible(true);
-            editor.clockKickToggle.setVisible(true);
-            editor.clockDivisionBox.setVisible(true);
-            editor.clockKickIntensitySlider.setVisible(true);
-            editor.floatIntensitySlider.setVisible(true);
-            editor.floatSpeedSlider.setVisible(true);
-            editor.seekBar.setVisible(true);
-
             editor.logPanelOpen = true;
             editor.logScrollOffset = 0;
-            editor.logMidiNotesToggle.setVisible(true);
-            editor.logMidiClockToggle.setVisible(true);
-            editor.clearLogButton.setVisible(true);
-
-            editor.resized();
         }
+
+
+        editor.resized();
 
         editor.repaint();
         return true;
@@ -214,37 +187,15 @@ bool InteractionManager::keyPressed(const KeyPress& key) const {
     if (key == KeyPress('b', ModifierKeys::noModifiers, 0)) {
         editor.blurToggle.setToggleState(!editor.blurToggle.getToggleState(),
                                          dontSendNotification);
+
         editor.repaint();
         return true;
     }
 
     if (key == KeyPress('o', ModifierKeys::noModifiers, 0)) {
         editor.optionsPanelOpen = !editor.optionsPanelOpen;
-        for (auto& box : editor.voiceChannelBox) box.setVisible(editor.optionsPanelOpen);
-        editor.videoToggle.setVisible(editor.optionsPanelOpen);
-        editor.blurToggle.setVisible(editor.optionsPanelOpen);
-        editor.blurSlider.setVisible(editor.optionsPanelOpen);
-        editor.videoZoomSlider.setVisible(editor.optionsPanelOpen);
-        editor.videoOpacitySlider.setVisible(editor.optionsPanelOpen);
-        editor.saveDefaultButton.setVisible(editor.optionsPanelOpen);
-        editor.savePositionsButton.setVisible(editor.optionsPanelOpen);
-        editor.loadPositionsButton.setVisible(editor.optionsPanelOpen);
-        editor.videoPlayPauseButton.setVisible(editor.optionsPanelOpen);
-        editor.videoStopButton.setVisible(editor.optionsPanelOpen);
-        editor.midiSettingsButton.setVisible(editor.optionsPanelOpen);
-        editor.ballSizeSlider.setVisible(editor.optionsPanelOpen);
-        editor.floatToggle.setVisible(editor.optionsPanelOpen);
-        editor.collisionToggle.setVisible(editor.optionsPanelOpen);
-        editor.clockKickToggle.setVisible(editor.optionsPanelOpen);
-        editor.clockDivisionBox.setVisible(editor.optionsPanelOpen);
-        editor.clockKickIntensitySlider.setVisible(editor.optionsPanelOpen);
-        editor.floatIntensitySlider.setVisible(editor.optionsPanelOpen);
-        editor.floatSpeedSlider.setVisible(editor.optionsPanelOpen);
-        editor.seekBar.setVisible(editor.optionsPanelOpen);
-        for (int i = 0; i < 7; ++i)
-            editor.voiceNameLabel[i].setVisible(editor.optionsPanelOpen);
-        if (editor.optionsPanelOpen)
-            editor.resized();
+
+        editor.resized();
         editor.repaint();
         return true;
     }
@@ -252,10 +203,8 @@ bool InteractionManager::keyPressed(const KeyPress& key) const {
     if (key == KeyPress('l', ModifierKeys::noModifiers, 0)) {
         editor.logPanelOpen = !editor.logPanelOpen;
         editor.logScrollOffset = 0;
-        editor.logMidiNotesToggle.setVisible(editor.logPanelOpen);
-        editor.logMidiClockToggle.setVisible(editor.logPanelOpen);
-        editor.clearLogButton.setVisible(editor.logPanelOpen);
-        if (editor.logPanelOpen) editor.resized();
+
+        editor.resized();
         editor.repaint();
         return true;
     }

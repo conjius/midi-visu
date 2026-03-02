@@ -56,9 +56,9 @@ namespace StyleTokens {
     // SeekBar
     static constexpr uint32_t kSeekBarBg = 0xff252525; // dark background
     static constexpr uint32_t kSeekBarTrack = 0xff404040; // unfilled track
-    static constexpr uint32_t kSeekBarLoop = 0x60ffffff; // loop region highlight (37%)
+    static constexpr uint32_t kSeekBarLoop = 0x5042a2c8; // loop region highlight (blue 31%)
     static constexpr uint32_t kSeekBarPlayhead = 0xffffffff; // playhead handle — white
-    static constexpr uint32_t kSeekBarHandle = 0xbfffffff; // loop handles — 75% white
+    static constexpr uint32_t kSeekBarHandle = 0xff42a2c8; // loop handles — JUCE default blue
     static constexpr uint32_t kSeekBarTime = 0x80ffffff; // time label text (50%)
 
     // ComboBox

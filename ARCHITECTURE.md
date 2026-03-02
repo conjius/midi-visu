@@ -18,7 +18,8 @@ src/
 ├── RangeSlider.h/cpp              Two-handle horizontal range slider widget
 ├── RangeSliderLogic.h/cpp         Pure math for range slider hit-testing and dragging
 ├── SeekBar.h/cpp                  Video timeline with loop and playhead handles
-└── MultiHandleSliderLogic.h/cpp   Pure math for three-handle slider
+├── MultiHandleSliderLogic.h/cpp   Pure math for three-handle slider
+└── OptionsPanelLayout.h/cpp       Pure math for options panel section folding and scrolling
 tests/
 ├── main.cpp                       Test runner entry point
 ├── VoiceManagerTests.cpp          VoiceManager unit tests
@@ -26,7 +27,8 @@ tests/
 ├── RangeSliderLogicTests.cpp      RangeSliderLogic unit tests
 ├── StyleTokensTests.cpp           StyleTokens unit tests
 ├── VideoListManagerTests.cpp      VideoListManager unit tests
-└── MultiHandleSliderLogicTests.cpp MultiHandleSliderLogic unit tests
+├── MultiHandleSliderLogicTests.cpp MultiHandleSliderLogic unit tests
+└── OptionsPanelLayoutTests.cpp    OptionsPanelLayout unit tests
 ```
 
 ## Class Descriptions and Dependencies
@@ -54,7 +56,7 @@ static methods to match a channel/note pair to a drum or melodic voice index.
 and state, and delegates painting and input to dedicated managers.
 
 - Owns: `UiManager`, `InteractionManager`, `StyleManager`, `VideoBackground`,
-  `VideoListManager`, `RangeSlider`, `SeekBar`
+  `VideoListManager`, `RangeSlider`, `SeekBar`, `OptionsPanelLayout`
 - Reads from: `MidivisuAudioProcessor` (via `audioProcessor` reference to access
   `MidiManager` / `VoiceManager` atomics)
 
@@ -108,8 +110,16 @@ middle-zone hit testing, and clamped drag translation in a range slider.
 
 - Dependencies: none (no JUCE)
 
-**`SeekBar`** — Custom JUCE Component implementing a video timeline with three handles
-(loop start, playhead, loop end) and a listener interface for loop/seek changes.
+**`SeekBar`** — Custom JUCE Component implementing a video timeline with playhead and
+loop handles. Features:
+
+- **Click-to-seek**: clicking empty track area moves playhead to that position.
+- **Elapsed fill**: brighter track fill from 0 to the playhead position.
+- **Loop handles**: drawn as full-size edge markers (matching RangeSlider style) with
+  timestamp labels below. Draggable regardless of loop enabled state.
+- **Loop toggle**: `setLoopEnabled(bool)` controls visual appearance — when disabled,
+  loop handles and region are drawn greyed out but remain interactive.
+- `kBarHeight = 40` (24px track area + 16px for loop time labels below).
 
 - Uses: `MultiHandleSliderLogic`
 
@@ -117,6 +127,38 @@ middle-zone hit testing, and clamped drag translation in a range slider.
 handle dragging, middle-zone dragging, and time formatting.
 
 - Dependencies: none (no JUCE)
+
+**`OptionsPanelLayout`** — Pure C++ layout engine that computes Y positions for all
+options panel sections given fold states and scroll offset.
+
+- Dependencies: none (no JUCE)
+
+## Options panel layout
+
+Layout Y positions for the options panel are computed by `OptionsPanelLayout`
+(pure C++, no JUCE). Sections can be folded/expanded; the panel supports vertical
+scrolling with a thin scrollbar on the right side.
+
+**Sections** (in order): MIDI ROUTING, VIDEO, CIRCLES, ANIMATION.
+
+- Clicking a section header toggles fold state; a triangle indicator shows state
+  (▼ expanded, ▶ collapsed).
+- When folded, section content (both painted elements and JUCE Component widgets) is
+  hidden. Subsequent sections shift up to fill the gap.
+- Mouse wheel scrolls the entire panel; scroll offset is clamped to `[0, maxScroll]`.
+- `resized()` and `UiManager::paint()` both query `OptionsPanelLayout` for Y positions,
+  ensuring widget bounds and painted elements stay synchronized.
+- JUCE child Components are repositioned via `setBounds()` on each scroll/fold change;
+  components scrolled outside the viewport are set invisible.
+
+## Log panel
+
+- Toggle with `L` key
+- 300px overlay on left side, newest entry first
+- `mouseWheelMove` for scrolling (deltaY * 30 lines)
+- Entries added continuously to `logLines` (StringArray, max 500) regardless of panel
+  open state
+- Scrollbar on the left side of the panel
 
 ## JUCE
 
@@ -147,14 +189,6 @@ Uses **hit-counter** approach (not sustained note state):
 - Reason: drum note-off arrives in the same audio block as note-on, so sustained-state
   approach always reads -1 at 60Hz
 
-## Log panel
-
-- Toggle with `L` key
-- 300px overlay on right side, newest entry first
-- `mouseWheelMove` for scrolling (deltaY * 30 lines)
-- Entries added continuously to `logLines` (StringArray, max 500) regardless of panel open
-  state
-
 ## Friend-class pattern
 
 - `InteractionManager` and `UiManager` are friends of `MidiVisuEditor`
@@ -171,7 +205,7 @@ Uses **hit-counter** approach (not sustained note state):
 - Framework: JUCE `UnitTest` with static registration
 - Test names must use ASCII dashes (not em-dashes) to avoid JUCE String assertions
 - Pure-C++ classes are tested: VoiceManager, MidiManager, RangeSliderLogic, StyleTokens,
-  VideoListManager, MultiHandleSliderLogic
+  VideoListManager, MultiHandleSliderLogic, OptionsPanelLayout
 
 ## Known quirks
 

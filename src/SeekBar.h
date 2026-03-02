@@ -1,15 +1,19 @@
 #pragma once
 #include <JuceHeader.h>
 #include "MultiHandleSliderLogic.h"
+#include "RangeSlider.h"
 
 class SeekBar : public Component {
 public:
     SeekBar();
 
     void paint(Graphics& g) override;
+    void resized() override;
     void mouseDown(const MouseEvent& e) override;
     void mouseDrag(const MouseEvent& e) override;
     void mouseUp(const MouseEvent& e) override;
+    void mouseWheelMove(const MouseEvent& e,
+                        const MouseWheelDetails& w) override;
 
     void setMaxValue(double maxSec);
     void setPlayhead(double sec);
@@ -19,6 +23,9 @@ public:
     double getLoopStart() const;
     double getLoopEnd() const;
     double getPlayhead() const;
+
+    void setLoopEnabled(bool enabled);
+    bool isLoopEnabled() const;
 
     class Listener {
     public:
@@ -33,13 +40,21 @@ public:
     bool isDragging() const;
 
     static constexpr float kThumbRadius = 8.0f;
-    static constexpr int kBarHeight = 24;
+    static constexpr int kTrackAreaHeight = 24;
+    static constexpr int kLabelHeight = 16;
+    static constexpr int kBarHeight = kTrackAreaHeight + kLabelHeight;
 
 private:
     float getTrackStart() const;
     float getTrackWidth() const;
+    void syncLoopSlider();
 
     MultiHandleSliderLogic logic;
+    bool loopEnabled_ = true;
+
+    // Visual-only JUCE slider that draws the blue loop handle thumbs.
+    // Non-interactive — SeekBar handles all mouse events.
+    RangeSlider loopSlider_;
 
     MultiHandleSliderLogic::HandleType activeHandle
         = MultiHandleSliderLogic::HandleType::None;

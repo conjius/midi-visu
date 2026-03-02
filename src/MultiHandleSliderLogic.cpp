@@ -21,7 +21,12 @@ void MultiHandleSliderLogic::setLoopEnd(double v) {
 }
 
 void MultiHandleSliderLogic::setMaxValue(double v) {
+    const double oldMax = maxValue_;
     maxValue_ = std::max(0.0, v);
+    // When transitioning from uninitialized (0) to a real duration,
+    // expand loopEnd to cover the full range.
+    if (oldMax <= 0.0 && maxValue_ > 0.0)
+        loopEnd_ = maxValue_;
     loopEnd_ = std::min(loopEnd_, maxValue_);
     loopStart_ = std::min(loopStart_, loopEnd_);
     playhead_ = std::min(playhead_, maxValue_);
