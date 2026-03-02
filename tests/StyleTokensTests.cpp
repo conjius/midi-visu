@@ -43,12 +43,6 @@ public:
                 StyleTokens::kSliderBg));
         }
 
-        beginTest("range slider track is brighter than range slider background");
-        {
-            expect(StyleTokens::red(StyleTokens::kRangeSliderTrack) > StyleTokens::red(
-                StyleTokens::kRangeSliderBg));
-        }
-
         beginTest("seekbar track is brighter than seekbar background");
         {
             expect(StyleTokens::red(StyleTokens::kSeekBarTrack) > StyleTokens::red(

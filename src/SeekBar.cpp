@@ -111,17 +111,23 @@ void SeekBar::paint(Graphics& g) {
 
     // Loop handles are drawn by loopSlider_ (JUCE blue thumbs)
 
-    // Loop time labels below the track area
+    // Loop time labels below the track area, enclosed in the highlighted region.
+    // Left label left-aligned at lsPx, right label right-aligned at lePx.
     const auto labelCol = Colour(StyleTokens::kSeekBarTime);
     g.setColour(loopEnabled_ ? labelCol : labelCol.withMultipliedAlpha(0.3f));
     g.setFont(Font(FontOptions().withHeight(StyleTokens::kLabelSize)));
     const int labelY = kTrackAreaHeight;
     const auto lsText = String(MultiHandleSliderLogic::formatTime(logic.loopStart()));
     const auto leText = String(MultiHandleSliderLogic::formatTime(logic.loopEnd()));
-    g.drawText(lsText, static_cast<int>(lsPx - 18), labelY, 36, kLabelHeight,
-               Justification::centred, false);
-    g.drawText(leText, static_cast<int>(lePx - 18), labelY, 36, kLabelHeight,
-               Justification::centred, false);
+    const int labelW = 50;
+    const int regionW = static_cast<int>(lePx - lsPx);
+    const int halfW = jmax(1, regionW / 2);
+    g.drawText(lsText, static_cast<int>(lsPx), labelY,
+               jmin(labelW, halfW), kLabelHeight,
+               Justification::left, false);
+    g.drawText(leText, static_cast<int>(lePx) - jmin(labelW, halfW), labelY,
+               jmin(labelW, halfW), kLabelHeight,
+               Justification::right, false);
 }
 
 void SeekBar::paintOverChildren(Graphics& g) {

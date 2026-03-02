@@ -219,6 +219,7 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
         styleManager.applyToSlider(*s);
     }
     ballSizeSlider.setScrollWheelEnabled(false);
+    styleManager.applyToSlider(ballSizeSlider);
 
     for (auto* b : {
              &videoToggle, &blurToggle, &floatToggle, &collisionToggle, &clockKickToggle

@@ -42,9 +42,7 @@ namespace StyleTokens {
     static constexpr uint32_t kSliderText = 0xccffffff; // = kValue
     static constexpr uint32_t kSliderOutline = 0x30ffffff; // = kDivider
 
-    // RangeSlider (TwoValueHorizontal)
-    static constexpr uint32_t kRangeSliderBg = 0xff303030;
-    static constexpr uint32_t kRangeSliderTrack = 0xbfffffff; // white 75%
+    // RangeSlider uses same Slider tokens above (via StyleManager::applyToSlider)
 
     // Button / ToggleButton
     static constexpr uint32_t kButtonBg = 0xff303030;

@@ -1,12 +1,8 @@
 #include "RangeSlider.h"
-#include "StyleTokens.h"
 
 RangeSlider::RangeSlider() {
     setSliderStyle(juce::Slider::TwoValueHorizontal);
     setScrollWheelEnabled(false);
-    setColour(juce::Slider::backgroundColourId,
-              juce::Colour(StyleTokens::kRangeSliderBg));
-    setColour(juce::Slider::trackColourId, juce::Colour(StyleTokens::kRangeSliderTrack));
 }
 
 void RangeSlider::mouseDown(const juce::MouseEvent& e) {
