@@ -18,14 +18,14 @@ jobs:
         id: cache-juce
         uses: actions/cache@v4
         with:
-          path: ../Downloads/JUCE
+          path: ../../Downloads/JUCE
           key: juce-8.0.6
 
       - name: Clone JUCE
         if: steps.cache-juce.outputs.cache-hit != 'true'
         run: |
-          mkdir -p ../Downloads
-          git clone --depth 1 --branch 8.0.6 https://github.com/juce-framework/JUCE.git ../Downloads/JUCE
+          mkdir -p ../../Downloads
+          git clone --depth 1 --branch 8.0.6 https://github.com/juce-framework/JUCE.git ../../Downloads/JUCE
 
       - name: Configure
         run: cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug

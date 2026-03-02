@@ -24,12 +24,12 @@ static methods to match a channel/note pair to a drum or melodic voice index.
 **`MidiVisuEditor`** — Main editor component that runs a 60 Hz timer, owns all UI widgets
 and state, and delegates painting and input to dedicated managers.
 
-- Owns: `DrawManager`, `InteractionManager`, `StyleManager`, `VideoBackground`,
-  `VideoListManager`, `RangeSlider`
+- Owns: `UiManager`, `InteractionManager`, `StyleManager`, `VideoBackground`,
+  `VideoListManager`, `RangeSlider`, `SeekBar`
 - Reads from: `MidivisuAudioProcessor` (via `audioProcessor` reference to access
   `MidiManager` / `VoiceManager` atomics)
 
-**`DrawManager`** — Renders all visual elements (circles, log panel, options panel, video
+**`UiManager`** — Renders all visual elements (circles, log panel, options panel, video
 frame) by reading editor state as a friend class.
 
 - Uses: `MidiVisuEditor` (friend access), `AppConstants`, `StyleManager`
@@ -79,6 +79,16 @@ middle-zone hit testing, and clamped drag translation in a range slider.
 
 - Dependencies: none (no JUCE)
 
+**`SeekBar`** — Custom JUCE Component implementing a video timeline with three handles
+(loop start, playhead, loop end) and a listener interface for loop/seek changes.
+
+- Uses: `MultiHandleSliderLogic`
+
+**`MultiHandleSliderLogic`** — Pure C++ math for a three-handle slider: hit testing,
+handle dragging, middle-zone dragging, and time formatting.
+
+- Dependencies: none (no JUCE)
+
 ## JUCE
 
 - Location: `~/Downloads/JUCE` (added via `add_subdirectory` in CMakeLists.txt)
@@ -93,10 +103,10 @@ Column 0 shows 4 stacked circles, one per voice, kick at bottom:
 
 | Voice | Name  | MIDI note | Color               |
 |-------|-------|-----------|---------------------|
-| 0     | Kick  | C1 (24)   | `#32cd32` limegreen |
-| 1     | Clap  | D1 (26)   | `#27a427`           |
-| 2     | Snare | E1 (28)   | `#1d7b1d`           |
-| 3     | HH    | F#1 (30)  | `#125212`           |
+| 0     | Kick  | C3 (48)   | `#32cd32` limegreen |
+| 1     | Noise | D3 (50)   | `#27a427`           |
+| 2     | Snare | E3 (52)   | `#1d7b1d`           |
+| 3     | HH    | F#3 (54)  | `#125212`           |
 
 ## Drum animation
 
@@ -104,7 +114,7 @@ Uses **hit-counter** approach (not sustained note state):
 
 - `drumVoiceHitCount[4]` atomics in processor — incremented on each note-on
 - Editor compares counter to `lastDrumHitCount[v]` each frame; any delta → snap
-  `drumSmoothedRadius[v]` to `maxDrumRadius`, then decay at `drumDecay = 0.07f/frame`
+  `drumSmoothedRadius[v]` to max radius, then decay at `drumSmoothing = 0.1f/frame`
 - Reason: drum note-off arrives in the same audio block as note-on, so sustained-state
   approach always reads -1 at 60Hz
 
@@ -118,7 +128,7 @@ Uses **hit-counter** approach (not sustained note state):
 
 ## Friend-class pattern
 
-- `InteractionManager` and `DrawManager` are friends of `MidiVisuEditor`
+- `InteractionManager` and `UiManager` are friends of `MidiVisuEditor`
 - Their headers forward-declare `class MidiVisuEditor;` — no circular includes
 - Their `.cpp` files include `PluginEditor.h` to get the full type
 
@@ -132,7 +142,7 @@ Uses **hit-counter** approach (not sustained note state):
 - Framework: JUCE `UnitTest` with static registration
 - Test names must use ASCII dashes (not em-dashes) to avoid JUCE String assertions
 - Pure-C++ classes are tested: VoiceManager, MidiManager, RangeSliderLogic, StyleTokens,
-  VideoListManager
+  VideoListManager, MultiHandleSliderLogic
 
 ## Known quirks
 
