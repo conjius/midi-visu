@@ -2,9 +2,9 @@
 #include "../src/VoiceManager.h"
 #include "../src/MidiManager.h"
 
-class MidiManagerTests : public juce::UnitTest {
+class MidiManagerTests : public UnitTest {
 public:
-    MidiManagerTests() : juce::UnitTest("MidiManager") {
+    MidiManagerTests() : UnitTest("MidiManager") {
     }
 
     void runTest() override {
@@ -12,10 +12,10 @@ public:
         {
             VoiceManager vm;
             MidiManager mm(vm);
-            juce::MidiBuffer buf;
-            buf.addEvent(juce::MidiMessage::midiClock(), 0);
-            buf.addEvent(juce::MidiMessage::midiClock(), 1);
-            buf.addEvent(juce::MidiMessage::midiClock(), 2);
+            MidiBuffer buf;
+            buf.addEvent(MidiMessage::midiClock(), 0);
+            buf.addEvent(MidiMessage::midiClock(), 1);
+            buf.addEvent(MidiMessage::midiClock(), 2);
             mm.processBlock(buf);
             expectEquals(mm.midiClockPulse.load(), 3);
 
@@ -28,9 +28,9 @@ public:
         {
             VoiceManager vm;
             MidiManager mm(vm);
-            juce::MidiBuffer buf;
+            MidiBuffer buf;
             // Voice 0: C3 (48) on ch10
-            buf.addEvent(juce::MidiMessage::noteOn(10, 48, (juce::uint8)100), 0);
+            buf.addEvent(MidiMessage::noteOn(10, 48, (uint8)100), 0);
             mm.processBlock(buf);
             expectEquals(mm.drumVoiceHitCount[0].load(), 1);
             expectEquals(mm.ch10RawHitCount.load(), 1);
@@ -45,8 +45,8 @@ public:
             MidiManager mm(vm);
             const int notes[4] = {48, 50, 52, 54};
             for (int v = 0; v < 4; ++v) {
-                juce::MidiBuffer buf;
-                buf.addEvent(juce::MidiMessage::noteOn(10, notes[v], (juce::uint8)100),
+                MidiBuffer buf;
+                buf.addEvent(MidiMessage::noteOn(10, notes[v], (uint8)100),
                              0);
                 mm.processBlock(buf);
                 expectEquals(mm.drumVoiceHitCount[v].load(), 1);
@@ -59,8 +59,8 @@ public:
             VoiceManager vm;
             MidiManager mm(vm);
             // ch2 → track index 0 → internal slot 1
-            juce::MidiBuffer buf;
-            buf.addEvent(juce::MidiMessage::noteOn(2, 60, (juce::uint8)100), 0);
+            MidiBuffer buf;
+            buf.addEvent(MidiMessage::noteOn(2, 60, (uint8)100), 0);
             mm.processBlock(buf);
             expectEquals(mm.channelHighestNote[1].load(), 60);
             expectEquals(mm.channelNoteOnNote[1].load(), 60);
@@ -71,13 +71,13 @@ public:
         {
             VoiceManager vm;
             MidiManager mm(vm);
-            juce::MidiBuffer buf;
-            buf.addEvent(juce::MidiMessage::noteOn(2, 60, (juce::uint8)100), 0);
+            MidiBuffer buf;
+            buf.addEvent(MidiMessage::noteOn(2, 60, (uint8)100), 0);
             mm.processBlock(buf);
             expectEquals(mm.channelHighestNote[1].load(), 60);
 
-            juce::MidiBuffer buf2;
-            buf2.addEvent(juce::MidiMessage::noteOff(2, 60), 0);
+            MidiBuffer buf2;
+            buf2.addEvent(MidiMessage::noteOff(2, 60), 0);
             mm.processBlock(buf2);
             expectEquals(mm.channelHighestNote[1].load(), -1);
         }
@@ -86,15 +86,15 @@ public:
         {
             VoiceManager vm;
             MidiManager mm(vm);
-            juce::MidiBuffer buf;
-            buf.addEvent(juce::MidiMessage::noteOn(2, 60, (juce::uint8)100), 0);
-            buf.addEvent(juce::MidiMessage::noteOn(2, 72, (juce::uint8)100), 1);
+            MidiBuffer buf;
+            buf.addEvent(MidiMessage::noteOn(2, 60, (uint8)100), 0);
+            buf.addEvent(MidiMessage::noteOn(2, 72, (uint8)100), 1);
             mm.processBlock(buf);
             expectEquals(mm.channelHighestNote[1].load(), 72);
 
             // Release the higher note; lower should now be highest.
-            juce::MidiBuffer buf2;
-            buf2.addEvent(juce::MidiMessage::noteOff(2, 72), 0);
+            MidiBuffer buf2;
+            buf2.addEvent(MidiMessage::noteOff(2, 72), 0);
             mm.processBlock(buf2);
             expectEquals(mm.channelHighestNote[1].load(), 60);
         }
@@ -103,9 +103,9 @@ public:
         {
             VoiceManager vm; // default: drum ch10, melodic ch2/3/4
             MidiManager mm(vm);
-            juce::MidiBuffer buf;
+            MidiBuffer buf;
             // ch5 is not assigned to anything
-            buf.addEvent(juce::MidiMessage::noteOn(5, 60, (juce::uint8)100), 0);
+            buf.addEvent(MidiMessage::noteOn(5, 60, (uint8)100), 0);
             mm.processBlock(buf);
             for (int i = 0; i < 4; ++i) {
                 expectEquals(mm.channelHighestNote[i].load(), -1);

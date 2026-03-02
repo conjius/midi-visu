@@ -1,9 +1,9 @@
 #include <JuceHeader.h>
 #include "../src/MultiHandleSliderLogic.h"
 
-class MultiHandleSliderLogicTests : public juce::UnitTest {
+class MultiHandleSliderLogicTests : public UnitTest {
 public:
-    MultiHandleSliderLogicTests() : juce::UnitTest("MultiHandleSliderLogic") {
+    MultiHandleSliderLogicTests() : UnitTest("MultiHandleSliderLogic") {
     }
 
     void runTest() override {
@@ -268,26 +268,26 @@ public:
 
         beginTest("formatTime - zero seconds");
         {
-            expectEquals(juce::String(MultiHandleSliderLogic::formatTime(0.0)),
-                         juce::String("0:00"));
+            expectEquals(String(MultiHandleSliderLogic::formatTime(0.0)),
+                         String("0:00"));
         }
 
         beginTest("formatTime - 65 seconds");
         {
-            expectEquals(juce::String(MultiHandleSliderLogic::formatTime(65.0)),
-                         juce::String("1:05"));
+            expectEquals(String(MultiHandleSliderLogic::formatTime(65.0)),
+                         String("1:05"));
         }
 
         beginTest("formatTime - 3661 seconds");
         {
-            expectEquals(juce::String(MultiHandleSliderLogic::formatTime(3661.0)),
-                         juce::String("61:01"));
+            expectEquals(String(MultiHandleSliderLogic::formatTime(3661.0)),
+                         String("61:01"));
         }
 
         beginTest("formatTime - fractional seconds rounds down");
         {
-            expectEquals(juce::String(MultiHandleSliderLogic::formatTime(59.9)),
-                         juce::String("0:59"));
+            expectEquals(String(MultiHandleSliderLogic::formatTime(59.9)),
+                         String("0:59"));
         }
     }
 };

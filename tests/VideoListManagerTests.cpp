@@ -1,9 +1,9 @@
 #include <JuceHeader.h>
 #include "../src/VideoListManager.h"
 
-class VideoListManagerTests : public juce::UnitTest {
+class VideoListManagerTests : public UnitTest {
 public:
-    VideoListManagerTests() : juce::UnitTest("VideoListManager") {
+    VideoListManagerTests() : UnitTest("VideoListManager") {
     }
 
     void runTest() override {

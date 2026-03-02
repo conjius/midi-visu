@@ -1,9 +1,9 @@
 #include <JuceHeader.h>
 #include "../src/VoiceManager.h"
 
-class VoiceManagerTests : public juce::UnitTest {
+class VoiceManagerTests : public UnitTest {
 public:
-    VoiceManagerTests() : juce::UnitTest("VoiceManager") {
+    VoiceManagerTests() : UnitTest("VoiceManager") {
     }
 
     void runTest() override {

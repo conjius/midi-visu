@@ -1,9 +1,9 @@
 #include <JuceHeader.h>
 #include "../src/RangeSliderLogic.h"
 
-class RangeSliderLogicTests : public juce::UnitTest {
+class RangeSliderLogicTests : public UnitTest {
 public:
-    RangeSliderLogicTests() : juce::UnitTest("RangeSliderLogic") {
+    RangeSliderLogicTests() : UnitTest("RangeSliderLogic") {
     }
 
     void runTest() override {

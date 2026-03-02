@@ -1,9 +1,9 @@
 #include <JuceHeader.h>
 #include "../src/StyleTokens.h"
 
-class StyleTokensTests : public juce::UnitTest {
+class StyleTokensTests : public UnitTest {
 public:
-    StyleTokensTests() : juce::UnitTest("StyleTokens") {
+    StyleTokensTests() : UnitTest("StyleTokens") {
     }
 
     void runTest() override {
