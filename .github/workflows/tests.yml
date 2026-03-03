@@ -51,7 +51,7 @@ jobs:
       - name: Generate HTML coverage report
         run: |
           genhtml coverage.info --output-directory coverage-html \
-                 --ignore-errors inconsistent,format
+                 --ignore-errors inconsistent,format,category
           rm -rf docs/coverage
           cp -r coverage-html docs/coverage
 
