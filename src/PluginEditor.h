@@ -18,6 +18,8 @@
 #include "VideoListManager.h"
 #include "SeekBar.h"
 #include "OptionsPanelLayout.h"
+#include "SvgShapeManager.h"
+#include "SvgWobbleLogic.h"
 
 class PassthroughComboBox : public ComboBox {
 public:
@@ -128,6 +130,7 @@ private:
     TextButton videoStopButton{CharPointer_UTF8("\xe2\x96\xa0")};           // ■
     TextButton loopButton{CharPointer_UTF8("\xe2\x86\xbb")};               // ↻
     TextButton midiSettingsButton{"Audio / MIDI Settings"};
+    Slider wobbleIntensitySlider;
     SeekBar seekBar;
 
     void seekBarLoopChanged(SeekBar* bar) override;
@@ -144,6 +147,10 @@ private:
     // Interaction and drawing managers — declared after all state they reference.
     InteractionManager interactionManager;
     UiManager uiManager;
+
+    // SVG shape rendering + wobble state
+    SvgShapeManager svgShapeManager;
+    SvgWobbleLogic::VoiceState wobbleState[7];
 
     // Pending loop values from settings, applied after maxValue becomes positive.
     double pendingLoopStart_ = -1.0;

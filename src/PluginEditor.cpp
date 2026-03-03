@@ -114,9 +114,14 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
     floatSpeedSlider.setValue(0.3, dontSendNotification);
     floatSpeedSlider.setSliderStyle(Slider::LinearHorizontal);
     floatSpeedSlider.setTextBoxStyle(Slider::TextBoxRight, false, 46, 20);
+    wobbleIntensitySlider.setRange(0.0, 1.0, 0.01);
+    wobbleIntensitySlider.setValue(0.5, dontSendNotification);
+    wobbleIntensitySlider.setSliderStyle(Slider::LinearHorizontal);
+    wobbleIntensitySlider.setTextBoxStyle(Slider::TextBoxRight, false, 46, 20);
     addChildComponent(floatToggle);
     addChildComponent(floatIntensitySlider);
     addChildComponent(floatSpeedSlider);
+    addChildComponent(wobbleIntensitySlider);
 
     videoToggleButton.onClick = [this] {
         appendLog(videoToggleButton.getToggleState() ? "Video: ON" : "Video: OFF",
@@ -215,7 +220,8 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
     // Disable scroll-wheel on all sliders so events bubble to the panel scroller.
     for (auto* s : {
              &blurSlider, &videoZoomSlider, &videoOpacitySlider,
-             &clockKickIntensitySlider, &floatIntensitySlider, &floatSpeedSlider
+             &clockKickIntensitySlider, &floatIntensitySlider, &floatSpeedSlider,
+             &wobbleIntensitySlider
          }) {
         s->setScrollWheelEnabled(false);
         styleManager.applyToSlider(*s);
@@ -295,6 +301,10 @@ MidiVisuEditor::MidiVisuEditor(MidivisuAudioProcessor& p)
         }
         videoListManager.setFiles(entries);
     }
+
+    // Load SVG shapes (fallback to circle polygons if missing)
+    svgShapeManager.loadShapes(
+        File(String(MIDI_VISU_ASSETS_DIR)).getChildFile("svg"));
 
     setSize(1920, 1080);
     initDefaultPositions();
@@ -392,6 +402,7 @@ void MidiVisuEditor::writePositionsToFile(const File& file) const {
     settings->setProperty("clockDiv", clockDivisionBox.getSelectedId());
     settings->setProperty("clockKick", clockKickToggle.getToggleState());
     settings->setProperty("clockKickIntensity", clockKickIntensitySlider.getValue());
+    settings->setProperty("wobbleIntensity", wobbleIntensitySlider.getValue());
     settings->setProperty("logMidiNotes", logMidiNotesToggle.getToggleState());
     settings->setProperty("logMidiClock", logMidiClockToggle.getToggleState());
     settings->setProperty("loopStart", seekBar.getLoopStart());
@@ -487,6 +498,10 @@ void MidiVisuEditor::readPositionsFromFile(const File& file) {
         if (s->hasProperty("clockKickIntensity"))
             clockKickIntensitySlider.setValue(
                 (double)s->getProperty("clockKickIntensity"),
+                dontSendNotification);
+        if (s->hasProperty("wobbleIntensity"))
+            wobbleIntensitySlider.setValue(
+                (double)s->getProperty("wobbleIntensity"),
                 dontSendNotification);
         if (s->hasProperty("logMidiNotes"))
             logMidiNotesToggle.setToggleState((bool)s->getProperty("logMidiNotes"),
@@ -620,6 +635,8 @@ void MidiVisuEditor::timerCallback() {
     const float minR = static_cast<float>(ballSizeSlider.getMinValue());
     const float maxR = static_cast<float>(ballSizeSlider.getMaxValue());
 
+    const float dt = 1.f / 60.f; // timer runs at 60 Hz
+
     // --- Drum voice animation (per-voice): instant snap up, smooth decay ---
     for (int v = 0; v < 4; ++v) {
         const int count = audioProcessor.midiManager.drumVoiceHitCount[v].load(
@@ -627,8 +644,11 @@ void MidiVisuEditor::timerCallback() {
         if (count != lastDrumHitCount[v]) {
             lastDrumHitCount[v] = count;
             drumSmoothedRadius[v] = maxR; // instant peak
+            SvgWobbleLogic::triggerDrumHit(wobbleState[v]);
         }
         drumSmoothedRadius[v] += (minR - drumSmoothedRadius[v]) * drumSmoothing;
+        SvgWobbleLogic::decayAmplitude(wobbleState[v], 0.08f);
+        SvgWobbleLogic::advanceState(wobbleState[v], dt);
     }
     {
         const int count = audioProcessor.midiManager.ch10RawHitCount.load(
@@ -663,6 +683,10 @@ void MidiVisuEditor::timerCallback() {
                                  ? (minR + (note / 127.0f) * (maxR - minR))
                                  : minR;
         smoothedRadius[i] += (target - smoothedRadius[i]) * smoothing;
+
+        SvgWobbleLogic::updateMelodicWobble(wobbleState[3 + i], note);
+        SvgWobbleLogic::decayAmplitude(wobbleState[3 + i], 0.08f);
+        SvgWobbleLogic::advanceState(wobbleState[3 + i], dt);
 
         const int count = audioProcessor.midiManager.channelNoteOnCount[i].load(
             std::memory_order_relaxed);
@@ -850,6 +874,7 @@ void MidiVisuEditor::resized() {
         clockKickIntensitySlider.setVisible(false);
         floatIntensitySlider.setVisible(false);
         floatSpeedSlider.setVisible(false);
+        wobbleIntensitySlider.setVisible(false);
         saveDefaultButton.setVisible(false);
         savePositionsButton.setVisible(false);
         loadPositionsButton.setVisible(false);
@@ -957,6 +982,9 @@ void MidiVisuEditor::resized() {
         place(floatSpeedSlider, px + pad,
               optionsLayout.animFloatSpeedSliderY() - scroll, panelW,
               StyleTokens::kSliderHeight);
+        place(wobbleIntensitySlider, px + pad,
+              optionsLayout.animWobbleSliderY() - scroll, panelW,
+              StyleTokens::kSliderHeight);
     } else {
         floatToggle.setVisible(false);
         collisionToggle.setVisible(false);
@@ -965,6 +993,7 @@ void MidiVisuEditor::resized() {
         clockKickIntensitySlider.setVisible(false);
         floatIntensitySlider.setVisible(false);
         floatSpeedSlider.setVisible(false);
+        wobbleIntensitySlider.setVisible(false);
     }
 
     // ── BUTTONS (always visible) ─────────────────────────────────────────────

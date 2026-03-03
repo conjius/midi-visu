@@ -19,7 +19,11 @@ src/
 ├── RangeSliderLogic.h/cpp         Pure math for range slider hit-testing and dragging
 ├── SeekBar.h/cpp                  Video timeline with loop and playhead handles
 ├── MultiHandleSliderLogic.h/cpp   Pure math for three-handle slider
-└── OptionsPanelLayout.h/cpp       Pure math for options panel section folding and scrolling
+├── OptionsPanelLayout.h/cpp       Pure math for options panel section folding and scrolling
+├── SvgWobbleLogic.h/cpp           Pure math for wobble deformation of vertex arrays
+└── SvgShapeManager.h/cpp          SVG shape loading, vertex extraction, deformed path rendering
+assets/
+└── svg/                           SVG shape files (shape_0.svg..shape_6.svg); optional
 tests/
 ├── main.cpp                       Test runner entry point
 ├── VoiceManagerTests.cpp          VoiceManager unit tests
@@ -28,7 +32,8 @@ tests/
 ├── StyleTokensTests.cpp           StyleTokens unit tests
 ├── VideoListManagerTests.cpp      VideoListManager unit tests
 ├── MultiHandleSliderLogicTests.cpp MultiHandleSliderLogic unit tests
-└── OptionsPanelLayoutTests.cpp    OptionsPanelLayout unit tests
+├── OptionsPanelLayoutTests.cpp    OptionsPanelLayout unit tests
+└── SvgWobbleLogicTests.cpp        SvgWobbleLogic unit tests
 ```
 
 ## Class Descriptions and Dependencies
@@ -140,6 +145,31 @@ formatting.
 
 - Dependencies: none (no JUCE)
 
+**`SvgWobbleLogic`** — Pure C++ class that computes radial wobble deformation of
+vertex arrays. Stores per-voice state (phase, amplitude, frequency) and deforms
+vertices using 3 sine harmonics for organic shape distortion.
+
+- Dependencies: none (no JUCE)
+- `Vertex` struct: `origX, origY, angle, radius` (polar coords from centroid)
+- `VoiceState` struct: `phase, amplitude, targetAmplitude, frequency`
+- `buildVertices`: compute centroid + polar coords from flat xy array
+- `deformVertices`: radial displacement using 3 sine harmonics
+- `advanceState`: increment phase by `frequency * 2π * dt`, wrap at 2π
+- `triggerDrumHit`: snap amplitude to 1.0, target to 0.0
+- `updateMelodicWobble`: map MIDI note 0-127 to frequency [2Hz..8Hz]
+- `decayAmplitude`: smooth-step amplitude toward target
+
+**`SvgShapeManager`** — JUCE-dependent class that loads SVG shape files, extracts
+vertex arrays, and renders deformed paths using `SvgWobbleLogic`.
+
+- Uses: `SvgWobbleLogic`
+- `loadShapes`: load `shape_0.svg`..`shape_6.svg` from `assets/svg/`, fallback to
+  32-vertex circle polygon if missing
+- `drawShape`: deform vertices → build Path → `g.fillPath()`
+- `extractVertices`: walk `Path::Iterator`, record lineTo endpoints, subdivide
+  cubicTo curves (~4 segments each)
+- Pre-allocated `deformBuffer_` avoids per-frame heap allocation
+
 **`OptionsPanelLayout`** — Pure C++ layout engine that computes Y positions for all
 options panel sections given fold states and scroll offset.
 
@@ -188,6 +218,46 @@ Column 0 shows 4 stacked circles, one per voice, kick at bottom:
 | 1     | Noise | D3 (50)   | `#27a427`           |
 | 2     | Snare | E3 (52)   | `#1d7b1d`           |
 | 3     | HH    | F#3 (54)  | `#125212`           |
+
+## SVG wobble deformation
+
+Each voice renders as a filled SVG shape (or fallback circle polygon) that deforms
+organically in response to MIDI input.
+
+**Wobble algorithm** — per-vertex pseudo-noise radial displacement:
+
+Each vertex has a unique `noiseSeed` (derived from its index using the golden ratio)
+and is displaced radially by a noise function built from 4 sine waves with
+irrational frequency ratios:
+
+```
+noise(seed, phase, slowPhase) =
+    sin(seed * 1.0  + phase * 0.7  + slowPhase * 0.3)  * 1.0
+  + sin(seed * 1.618 + phase * 1.3 + slowPhase * 0.7) * 0.7
+  + sin(seed * 2.732 + phase * 0.4 + slowPhase * 1.1) * 0.5
+  + sin(seed * 0.577 + phase * 2.1 + slowPhase * 0.2) * 0.3
+  / 2.5 (normalised)
+
+displacement = wobbleAmount * amplitude * radius * kMaxDisplacement * noise
+```
+
+- `wobbleAmount` — global intensity from the "Wobble" slider (0..1)
+- `amplitude` — per-voice, decays toward `targetAmplitude` each frame
+- `radius` — distance from centroid to original vertex position
+- `kMaxDisplacement` — 0.4 (40% max radial displacement)
+- `phase` — advances at `frequency` Hz; `slowPhase` always drifts at 0.13 Hz
+- The irrational ratios (phi, sqrt(e), 1/sqrt(3)) prevent periodicity
+
+**Melodic voices** — wobble speed tied to playing note's pitch:
+- Note 0 → 0.5 Hz, Note 127 → 2.5 Hz (slow, organic)
+- Amplitude → 1.0 while note is active, decays to 0.0 when released
+
+**Drum voices** — wobble on hit and decay:
+- On hit: amplitude snaps to 1.0, target set to 0.0 (decays immediately)
+
+**SVG loading** — `shape_0.svg`..`shape_6.svg` from `assets/svg/`. Missing files
+fall back to a 32-vertex regular polygon (circle approximation). Vertices are
+extracted once at load time; deformation happens per-frame via `SvgWobbleLogic`.
 
 ## Drum animation
 

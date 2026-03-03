@@ -62,6 +62,7 @@ public:
     int animClockKickSliderY() const;
     int animFloatIntensitySliderY() const;
     int animFloatSpeedSliderY() const;
+    int animWobbleSliderY() const;
     int buttonsY() const;
 
     // Hit-test: which section header contains this content-space Y?
@@ -74,7 +75,7 @@ public:
     static constexpr int kMidiRoutingContentH = 7 * 26;     // 182
     static constexpr int kVideoContentH = 288 + StyleTokens::kPadding;
     static constexpr int kCirclesContentH = 80;
-    static constexpr int kAnimationContentH = 304;
+    static constexpr int kAnimationContentH = 354;
     static constexpr int kButtonsH = 68;
 
     // Y where the first foldable section starts

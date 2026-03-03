@@ -179,7 +179,7 @@ public:
             const int btnsBefore = layout.buttonsY();
             layout.setFolded(OptionsPanelLayout::Animation, true);
             const int btnsAfter = layout.buttonsY();
-            expectEquals(btnsBefore - btnsAfter, 304);
+            expectEquals(btnsBefore - btnsAfter, 354);
         }
 
         beginTest("fold clamps scroll");
@@ -201,7 +201,7 @@ public:
             OptionsPanelLayout layout;
             const int expected = 66 + 4 * (20 + 20)
                                  + 182 + OptionsPanelLayout::kVideoContentH
-                                 + 80 + 304 + 68;
+                                 + 80 + 354 + 68;
             expectEquals(layout.contentHeight(), expected);
         }
     }

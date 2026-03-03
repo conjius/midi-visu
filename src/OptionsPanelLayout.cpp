@@ -171,6 +171,10 @@ int OptionsPanelLayout::animFloatSpeedSliderY() const {
     return sectionHeaderY(Animation) + 268;
 }
 
+int OptionsPanelLayout::animWobbleSliderY() const {
+    return sectionHeaderY(Animation) + 318;
+}
+
 int OptionsPanelLayout::buttonsY() const {
     int y = kFirstSectionY;
     for (int i = 0; i < SectionCount; ++i) {

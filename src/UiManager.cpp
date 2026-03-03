@@ -63,20 +63,23 @@ void UiManager::paint(Graphics& g) const {
     // ── Circles ────────────────────────────────────────────────────────────────
     g.setOpacity(1.0f);
 
+    const float wobbleAmt = static_cast<float>(
+        editor.wobbleIntensitySlider.getValue());
+
     for (int v = 0; v < 4; ++v) {
         const float r = editor.drumSmoothedRadius[v];
         const float cx = editor.circlePos[v].x + editor.floatOffset[v].x;
         const float cy = editor.circlePos[v].y + editor.floatOffset[v].y;
-        g.setColour(drumColours[v]);
-        g.fillEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f);
+        editor.svgShapeManager.drawShape(g, v, cx, cy, r, drumColours[v],
+                                         editor.wobbleState[v], wobbleAmt);
     }
 
     for (int i = 1; i < 4; ++i) {
         const float r = editor.smoothedRadius[i];
         const float cx = editor.circlePos[3 + i].x + editor.floatOffset[3 + i].x;
         const float cy = editor.circlePos[3 + i].y + editor.floatOffset[3 + i].y;
-        g.setColour(kChColours[i]);
-        g.fillEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f);
+        editor.svgShapeManager.drawShape(g, 3 + i, cx, cy, r, kChColours[i],
+                                         editor.wobbleState[3 + i], wobbleAmt);
     }
 
     // ── Log panel background (left side, drawn over circles) ───────────────────
@@ -313,6 +316,8 @@ void UiManager::paint(Graphics& g) const {
                 g.drawText("Intensity", px + pad, animY + 204,
                            panelW - pad * 2, 14, Justification::left);
                 g.drawText("Speed", px + pad, animY + 254,
+                           panelW - pad * 2, 14, Justification::left);
+                g.drawText("Wobble", px + pad, animY + 304,
                            panelW - pad * 2, 14, Justification::left);
             }
         }
