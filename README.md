@@ -3,7 +3,7 @@
 [![Standalone](https://github.com/conjius/midi-visu/actions/workflows/ci.yml/badge.svg)](https://github.com/conjius/midi-visu/actions/workflows/ci.yml)
 [![VST3](https://github.com/conjius/midi-visu/actions/workflows/vst3.yml/badge.svg)](https://github.com/conjius/midi-visu/actions/workflows/vst3.yml)
 [![Tests](https://github.com/conjius/midi-visu/actions/workflows/tests.yml/badge.svg)](https://github.com/conjius/midi-visu/actions/workflows/tests.yml)
-[![Coverage](https://conjius.github.io/midi-visu/badges/coverage.svg)](https://github.com/conjius/midi-visu/actions/workflows/tests.yml)
+[![Coverage](https://conjius.github.io/midi-visu/badges/coverage.svg)](https://conjius.github.io/midi-visu/coverage/)
 [![Release](https://img.shields.io/github/v/release/conjius/midi-visu)](https://github.com/conjius/midi-visu/releases/latest)
 [![Pages](https://img.shields.io/badge/GitHub%20Pages-live-32cd32)](https://conjius.github.io/midi-visu/)
 
